@@ -2,7 +2,7 @@
 
 # YT Notes
 
-YT Notes turns a YouTube video into notes that you can read in a few minutes. You paste a link or type a topic. The app writes the notes and can record an audio version on your Mac.
+YT Notes turns a YouTube video into notes that you can read in a few minutes. You paste one or more links, a playlist, or a topic. The app writes the notes and can record an audio version on your Mac.
 
 Each note has these parts:
 
@@ -48,7 +48,13 @@ python3 ytnotes.py
 
 The app opens at `http://127.0.0.1:8765` in your browser. Paste a YouTube link into the box and press Enter. Notes for a one-hour video take about one minute.
 
+To read several videos, paste one link on each line. Press Shift+Enter to start a new line. The app writes up to three notes at the same time.
+
+If you paste a playlist link, the app reads the first 50 videos of the playlist. A playlist link contains `/playlist?list=`. A video link that also contains `list=` gives only that video.
+
 If you type a topic instead of a link, the app finds the best videos about the topic. Select how much video it covers, from 30 minutes to 4 hours. The app then writes one note for each video.
+
+Each playlist and each topic becomes a collection in the library. A collection page shows each video with its TL;DR, in playlist order. Each note in a collection has links to the previous and the next video.
 
 To listen to a note, select Listen. The first recording of a note takes about one minute. After that, the audio starts immediately. The player continues while you read other notes, and it remembers your position in each note.
 
@@ -73,6 +79,8 @@ You can also use YT Notes without the browser. Each command saves its result in 
 | Command | Result |
 |---|---|
 | `python3 ytnotes.py "https://youtu.be/VIDEO_ID"` | Writes notes for one video. |
+| `python3 ytnotes.py "https://youtu.be/ID_1" "https://youtu.be/ID_2"` | Writes notes for each video. |
+| `python3 ytnotes.py "https://www.youtube.com/playlist?list=PLAYLIST_ID"` | Writes notes for the first 50 videos of a playlist and saves the playlist as a collection. |
 | `python3 ytnotes.py "saas distribution" -t 60` | Writes notes for the best videos on a topic, about 60 minutes of video in total. |
 | `python3 ytnotes.py "https://youtu.be/VIDEO_ID" --audio --voice bm_george` | Writes notes and records the audio in the voice that you select. |
 | `python3 ytnotes.py --add-glossary` | Adds a glossary to old notes that do not have one. |
@@ -118,7 +126,7 @@ The project has these files and folders:
 | `llm.py` | The code that sends prompts to pi or Claude Code. |
 | `skills/simple-english/` | A copy of the simple-english skill, with its license and source. |
 | `assets/` | The app icon in SVG and PNG. |
-| `notes/` | Your notes, the audio files, and `index.json`. Git ignores this folder. |
+| `notes/` | Your notes, the audio files, `index.json`, and `collections.json`. Git ignores this folder. |
 | `playlists/` | The playlists from `ytlearn.py`. Git ignores this folder. |
 
 ## Troubleshooting
