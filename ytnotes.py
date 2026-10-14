@@ -299,6 +299,46 @@ def download_video(vid, workdir):
     return None, (errors or out.stderr.strip().splitlines() or ["no output"])[-1][:200]
 
 
+THUMB = (32, 18)
+
+
+def tiny_frame(video, t):
+    """A 32x18 grayscale copy of the frame at t seconds, as bytes, for comparing frames cheaply."""
+    out = subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1",
+                          "-vf", f"scale={THUMB[0]}:{THUMB[1]},format=gray", "-f", "rawvideo", "-"],
+                         capture_output=True, timeout=60)
+    return out.stdout if len(out.stdout) == THUMB[0] * THUMB[1] else None
+
+
+def frame_diff(a, b):
+    return sum(abs(x - y) for x, y in zip(a, b)) / len(a)
+
+
+def pick_frames(video, spans, per_step=6):
+    """Choose one moment in each (start, end) span that best shows what is on screen.
+
+    Tutorials cut back to the same shot again and again, usually the presenter talking to the camera.
+    So for each step, take a few candidate frames and keep the one that looks least like the candidates
+    of the other steps. Blank frames (fades, black screens) are skipped."""
+    cands = []
+    for i, (t0, t1) in enumerate(spans):
+        span = max(2, t1 - t0)
+        for k in range(per_step):
+            t = t0 + span * (0.1 + 0.8 * k / max(1, per_step - 1))
+            img = tiny_frame(video, t)
+            if img:
+                mean = sum(img) / len(img)
+                if (sum((x - mean) ** 2 for x in img) / len(img)) ** 0.5 >= 12:
+                    cands.append((i, t, img))
+    picks = {}
+    for i, t, img in cands:
+        others = sorted(frame_diff(img, o) for j, _, o in cands if j != i)
+        score = sum(others[:3]) / len(others[:3]) if others else 0
+        if score > picks.get(i, (-1, 0))[0]:
+            picks[i] = (score, t)
+    return [picks[i][1] if i in picks else t0 + min(5, (t1 - t0) / 4) for i, (t0, t1) in enumerate(spans)]
+
+
 def add_frames(vid, md, total, log=print):
     """Put a frame from the video under each numbered step, linked to that moment in the video.
     Returns the new markdown and an error message, which is empty when the frames worked."""
@@ -307,6 +347,9 @@ def add_frames(vid, md, total, log=print):
         return md, ""
     log(f"Downloading the video for screenshots ({len(steps)} steps)…")
     out_dir = FRAMES / vid
+    starts = [to_secs(m.group(2)) for m in steps]
+    spans = [(t0, starts[i + 1] if i + 1 < len(starts) and starts[i + 1] > t0 else (total or t0 + 30))
+             for i, t0 in enumerate(starts)]
     with tempfile.TemporaryDirectory() as workdir:
         video, error = download_video(vid, workdir)
         if not video:
@@ -315,21 +358,17 @@ def add_frames(vid, md, total, log=print):
         out_dir.mkdir(parents=True, exist_ok=True)
         for old in out_dir.glob("*.jpg"):
             old.unlink()
-        starts = [to_secs(m.group(2)) for m in steps]
-        for i, m in enumerate(steps):
-            t0 = starts[i]
-            t1 = starts[i + 1] if i + 1 < len(starts) and starts[i + 1] > t0 else (total or t0 + 30)
-            span = max(2, t1 - t0)
-            # Skip the first seconds, when the presenter is still introducing the step, and let ffmpeg pick
-            # the most representative frame of the next few seconds so fades and blur are avoided.
-            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", str(t0 + min(5, span / 4)), "-t",
-                            str(min(8, span / 2)), "-i", str(video), "-vf", "thumbnail=240,scale='min(1280,iw)':-2",
-                            "-frames:v", "1", "-q:v", "4", str(out_dir / f"{m.group(1)}.jpg")], capture_output=True, timeout=120)
+        log("Choosing screenshots…")
+        times = pick_frames(video, spans)
+        for m, t in zip(steps, times):
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1",
+                            "-vf", "scale='min(1280,iw)':-2", "-q:v", "4", str(out_dir / f"{m.group(1)}.jpg")],
+                           capture_output=True, timeout=120)
     parts, last = [], 0
-    for m, t0 in zip(steps, starts):
+    for m, t in zip(steps, times):
         if (out_dir / f"{m.group(1)}.jpg").exists():
-            parts += [md[last:m.end()], f"\n\n[![Step {m.group(1)} at {m.group(2)}](/frames/{vid}/{m.group(1)}.jpg)]"
-                                        f"(https://youtu.be/{vid}?t={t0})"]
+            parts += [md[last:m.end()], f"\n\n[![Step {m.group(1)} at {stamp(t)}](/frames/{vid}/{m.group(1)}.jpg)]"
+                                        f"(https://youtu.be/{vid}?t={int(t)})"]
             last = m.end()
     return "".join(parts) + md[last:], ""
 
