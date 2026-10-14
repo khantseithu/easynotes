@@ -7,6 +7,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.parse
 import uuid
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
@@ -21,6 +22,9 @@ import ytlearn
 ROOT = Path(__file__).resolve().parent
 NOTES = ROOT / "notes"
 INDEX = NOTES / "index.json"
+COLLECTIONS = NOTES / "collections.json"
+MAX_PLAYLIST = 50
+SKIP_LISTS = ("RD", "WL", "LL", "UL")
 DEFAULT_MODEL = llm.DEFAULT_MODEL
 LOCK = threading.Lock()
 TTS_LOCK = threading.Lock()
@@ -326,6 +330,95 @@ def add_glossary(vid, model):
     return True
 
 
+def load_collections():
+    return json.loads(COLLECTIONS.read_text()) if COLLECTIONS.exists() else []
+
+
+def save_collection(c):
+    NOTES.mkdir(exist_ok=True)
+    with LOCK:
+        cols = [x for x in load_collections() if x["id"] != c["id"]]
+        cols.insert(0, c)
+        COLLECTIONS.write_text(json.dumps(cols, indent=2, ensure_ascii=False))
+
+
+def tldr(md):
+    m = re.search(r"^## TL;DR\s*\n(.+?)(?=^## |\Z)", md, re.S | re.M)
+    return re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", m.group(1)).strip() if m else ""
+
+
+def collection_view(c):
+    notes = {n["id"]: n for n in load_index()}
+    items = []
+    for v in c["videos"]:
+        n = notes.get(v["id"])
+        if n and (NOTES / f"{v['id']}.md").exists():
+            items.append({**n, "status": "ready", "tldr": tldr((NOTES / f"{v['id']}.md").read_text())})
+        elif v["id"] in c.get("skipped", {}):
+            items.append({**v, "status": "skipped", "reason": c["skipped"][v["id"]]})
+        else:
+            items.append({**v, "status": "pending"})
+    return {**c, "items": items}
+
+
+def collection_summary(c):
+    notes = {n["id"]: n for n in load_index()}
+    ready = [notes[v["id"]] for v in c["videos"] if v["id"] in notes]
+    return {k: c[k] for k in ("id", "kind", "title", "channel", "created")} | {
+        "count": len(c["videos"]), "ready": len(ready),
+        "secs": sum(v.get("secs") or 0 for v in c["videos"]),
+        "read_mins": sum(n["read_mins"] for n in ready),
+    }
+
+
+def note_collections(vid):
+    out = []
+    for c in load_collections():
+        ids = [v["id"] for v in c["videos"]]
+        if vid in ids:
+            i = ids.index(vid)
+            near = lambda j: {"id": c["videos"][j]["id"], "title": c["videos"][j]["title"]} if 0 <= j < len(ids) else None
+            out.append({"id": c["id"], "title": c["title"], "kind": c["kind"], "index": i + 1, "count": len(ids),
+                        "prev": near(i - 1), "next": near(i + 1)})
+    return out
+
+
+def parse_input(text):
+    urls = re.findall(r"https?://\S+|(?:www\.)?(?:youtube\.com|youtu\.be)/\S+", text)
+    videos, playlists = [], []
+    for u in urls:
+        parsed = urllib.parse.urlparse(u if u.startswith("http") else "https://" + u)
+        lst = urllib.parse.parse_qs(parsed.query).get("list", [""])[0]
+        if parsed.path.rstrip("/") == "/playlist" and lst and not lst.startswith(SKIP_LISTS):
+            playlists.append(lst)
+        elif video_id(u):
+            videos.append(video_id(u))
+    if urls:
+        if not videos and not playlists:
+            raise RuntimeError("No YouTube video or playlist links found")
+        return videos, playlists, ""
+    if video_id(text):
+        return [video_id(text)], [], ""
+    return [], [], text.strip()
+
+
+def expand_playlist(pid):
+    out = subprocess.run(["yt-dlp", "--flat-playlist", "-J", "--no-warnings", f"https://www.youtube.com/playlist?list={pid}"],
+                         capture_output=True, text=True, timeout=180)
+    try:
+        data = json.loads(out.stdout)
+    except json.JSONDecodeError:
+        raise RuntimeError(f"Could not read playlist {pid}. It can be private or deleted.")
+    entries = [e for e in data.get("entries") or [] if e and e.get("id") and e.get("title") not in ("[Private video]", "[Deleted video]")]
+    return {
+        "id": pid, "kind": "playlist", "title": data.get("title") or pid,
+        "channel": data.get("channel") or data.get("uploader") or "",
+        "url": f"https://www.youtube.com/playlist?list={pid}", "total": len(entries),
+        "videos": [{"id": e["id"], "title": e.get("title") or e["id"], "secs": int(e.get("duration") or 0)} for e in entries[:MAX_PLAYLIST]],
+        "created": datetime.now().isoformat(timespec="seconds"),
+    }
+
+
 def topic_videos(topic, minutes, model):
     budget = minutes * 60
     pool = ytlearn.candidates(topic, budget, 10000, 90 * 60)
@@ -337,30 +430,52 @@ def run_job(job, text, minutes, model):
         job["message"] = msg
 
     try:
-        vid = video_id(text)
-        if vid:
-            vids = [vid]
-        else:
-            log(f"Finding the best videos on “{text}”…")
-            vids = [v["id"] for v in topic_videos(text, minutes, model)]
-            if not vids:
+        videos, playlists, topic = parse_input(text)
+        collections = []
+        if topic:
+            log(f"Finding the best videos on “{topic}”…")
+            picks = topic_videos(topic, minutes, model)
+            if not picks:
                 raise RuntimeError("No good videos found for that topic")
+            collections.append({
+                "id": "t-" + re.sub(r"[^a-z0-9]+", "-", topic.lower()).strip("-")[:60], "kind": "topic", "title": topic,
+                "channel": "", "url": "", "total": len(picks),
+                "videos": [{"id": v["id"], "title": v["title"], "secs": v["secs"]} for v in picks],
+                "created": datetime.now().isoformat(timespec="seconds"),
+            })
+        for pid in playlists:
+            log("Reading the playlist…")
+            collections.append(expand_playlist(pid))
+        for c in collections:
+            save_collection(c)
+        vids = list(dict.fromkeys(videos + [v["id"] for c in collections for v in c["videos"]]))
+        if not vids:
+            raise RuntimeError("The playlist has no public videos")
+        title = collections[0]["title"] if len(collections) == 1 and not videos else (f"{len(vids)} videos" if len(vids) > 1 else None)
+        job.update(collections=[c["id"] for c in collections], title=title, total=len(vids), done=0)
         log(f"Reading {len(vids)} video{'s' if len(vids) > 1 else ''}…")
-        done, errors = [], []
+        done, errors = [], {}
 
         def one(v):
             try:
-                done.append(make_notes(v, model, log)["id"])
-                log(f"Done {len(done)} of {len(vids)}")
+                note = make_notes(v, model, log if len(vids) == 1 else (lambda m: None))
+                done.append(note["id"])
             except Exception as e:
-                errors.append(str(e))
+                errors[v] = str(e)
+            finished = len(done) + len(errors)
+            job.update(ids=list(done), done=finished)
+            if len(vids) > 1:
+                log(f"{finished} of {len(vids)} done")
 
-        with ThreadPoolExecutor(2) as ex:
+        with ThreadPoolExecutor(3) as ex:
             list(ex.map(one, vids))
+        for c in collections:
+            c["skipped"] = {v["id"]: errors[v["id"]] for v in c["videos"] if v["id"] in errors}
+            save_collection(c)
         msg = f"{len(done)} note{'s' if len(done) != 1 else ''} ready"
         if errors:
-            msg += f" · {len(errors)} skipped: " + "; ".join(errors)
-        job.update(status="done" if done else "error", ids=done, message=msg if done else "; ".join(errors))
+            msg += f" · {len(errors)} skipped: " + "; ".join(dict.fromkeys(errors.values()))
+        job.update(status="done" if done else "error", ids=done, message=msg if done else "; ".join(dict.fromkeys(errors.values())))
     except Exception as e:
         job.update(status="error", message=str(e))
 
@@ -413,10 +528,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_file(f, "audio/mp4") if f.exists() else self.send(404, {"error": "not found"})
         if self.path == "/manifest.webmanifest":
             return self.send(200, (ROOT / "manifest.webmanifest").read_bytes(), "application/manifest+json")
-        m = re.fullmatch(r"/assets/([\w-]+\.(svg|png))", self.path)
+        if self.path == "/favicon.ico":
+            self.path = "/assets/favicon.ico"
+        m = re.fullmatch(r"/assets/([\w-]+\.(svg|png|ico))", self.path)
         if m:
             f = ROOT / "assets" / m.group(1)
-            ctype = "image/svg+xml" if m.group(2) == "svg" else "image/png"
+            ctype = {"svg": "image/svg+xml", "png": "image/png", "ico": "image/x-icon"}[m.group(2)]
             return self.send(200, f.read_bytes(), ctype) if f.exists() else self.send(404, {"error": "not found"})
         if self.path == "/":
             return self.send(200, (ROOT / "ytnotes.html").read_bytes(), "text/html; charset=utf-8")
@@ -427,7 +544,14 @@ class Handler(BaseHTTPRequestHandler):
             meta = next((n for n in load_index() if n["id"] == m.group(1)), None)
             if not meta:
                 return self.send(404, {"error": "not found"})
-            return self.send(200, {**meta, "markdown": (NOTES / f"{meta['id']}.md").read_text()})
+            return self.send(200, {**meta, "markdown": (NOTES / f"{meta['id']}.md").read_text(),
+                                   "collections": note_collections(meta["id"])})
+        if self.path == "/api/collections":
+            return self.send(200, [collection_summary(c) for c in load_collections()])
+        m = re.fullmatch(r"/api/collections/([\w-]+)", self.path)
+        if m:
+            c = next((c for c in load_collections() if c["id"] == m.group(1)), None)
+            return self.send(200, collection_view(c)) if c else self.send(404, {"error": "not found"})
         m = re.fullmatch(r"/api/jobs/(\w+)", self.path)
         if m and m.group(1) in JOBS:
             return self.send(200, JOBS[m.group(1)])
@@ -448,7 +572,8 @@ class Handler(BaseHTTPRequestHandler):
         if not text:
             return self.send(400, {"error": "Paste a YouTube link or type a topic"})
         job_id = uuid.uuid4().hex[:12]
-        JOBS[job_id] = {"id": job_id, "status": "running", "message": "Starting…", "ids": []}
+        JOBS[job_id] = {"id": job_id, "status": "running", "message": "Starting…", "ids": [], "collections": [],
+                        "title": None, "total": 0, "done": 0}
         threading.Thread(target=run_job, args=(JOBS[job_id], text, int(body.get("minutes") or 60), self.model),
                          daemon=True).start()
         self.send(202, JOBS[job_id])
@@ -466,7 +591,7 @@ def lan_ip():
 
 def main():
     ap = argparse.ArgumentParser(description="Read YouTube videos instead of watching them.")
-    ap.add_argument("input", nargs="?", help="YouTube URL or topic; omit to open the app")
+    ap.add_argument("input", nargs="*", help="YouTube links, playlist links, or a topic; omit to open the app")
     ap.add_argument("-t", "--time", type=int, default=60, help="minutes of video to cover for a topic")
     ap.add_argument("--model", default=DEFAULT_MODEL,
                     help=f"pi model as provider/model (default {DEFAULT_MODEL}), or a Claude model such as claude-haiku-5-5")
@@ -488,7 +613,7 @@ def main():
 
     if args.input:
         job = {"status": "running", "message": "", "ids": []}
-        run_job(job, args.input, args.time, args.model)
+        run_job(job, "\n".join(args.input), args.time, args.model)
         if job["status"] == "error":
             sys.exit(job["message"])
         for vid in job["ids"]:
