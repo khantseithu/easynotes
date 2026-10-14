@@ -66,6 +66,12 @@ The server shows a second address, for example `http://192.168.1.117:8765`. Open
 
 Use `--lan` only on a network that you trust. The app has no password, so each device on the network can open it.
 
+## Use the Chrome extension
+
+The Chrome extension shows your notes next to the video on YouTube. Select a timestamp to jump to that part of the video, or select Make notes for a video that has no notes yet. The server must be running.
+
+To install it, go to `chrome://extensions`, turn on Developer mode, select Load unpacked, and select the `extension` folder. See [extension/README.md](extension/README.md) for more.
+
 ## Command line
 
 You can also use YT Notes without the browser. Each command saves its result in the `notes/` folder:
@@ -118,6 +124,7 @@ The project has these files and folders:
 | `llm.py` | The code that sends prompts to pi or Claude Code. |
 | `skills/simple-english/` | A copy of the simple-english skill, with its license and source. |
 | `assets/` | The app icon in SVG and PNG. |
+| `extension/` | The Chrome extension. |
 | `notes/` | Your notes, the audio files, and `index.json`. Git ignores this folder. |
 | `playlists/` | The playlists from `ytlearn.py`. Git ignores this folder. |
 
