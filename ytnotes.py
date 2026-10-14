@@ -20,6 +20,7 @@ import ytlearn
 ROOT = Path(__file__).resolve().parent
 NOTES = ROOT / "notes"
 INDEX = NOTES / "index.json"
+DEFAULT_MODEL = "claude-haiku-5-5"
 LOCK = threading.Lock()
 TTS_LOCK = threading.Lock()
 JOBS = {}
@@ -73,6 +74,31 @@ Sort alphabetically, as "- **TERM** (full name, if it is an abbreviation): one p
 Omit this section only if the notes use no such terms.
 
 Output only the "## Glossary" section, or nothing if there are no such terms."""
+
+
+def simple_english_rules():
+    path = ROOT / "skills" / "simple-english" / "SKILL.md"
+    if not path.exists():
+        return ""
+    text = path.read_text()
+    section = text.split("## The Document", 1)[-1].split("## The Reply", 1)[0]
+    rules = "\n".join(l for l in section.splitlines() if "references/" not in l).split("\nBefore (AI output):", 1)[0].strip()
+    check = text.split("## Self-Check Before You Deliver", 1)[-1].split("## Modes", 1)[0]
+    doc_check = next((l for l in check.splitlines() if l.startswith("2. Document:")), "")
+    return f"""
+
+Writing rules (the simple-english skill, plain mode). Apply them to every sentence you write.
+The required structure above wins where the two conflict: keep its headings, bullets, checkboxes, timestamps and bold glossary terms.
+Never change verbatim quotes, numbers, names or facts.
+
+<simple-english>
+{rules}
+
+Self-check: {doc_check.removeprefix("2. Document: ")}
+</simple-english>"""
+
+
+WRITING_RULES = simple_english_rules()
 
 
 def video_id(text):
@@ -197,12 +223,13 @@ def make_notes(vid, model, log=print):
         raise RuntimeError(f"No English transcript available for {vid}")
     log(f"Writing notes: {meta['title']}")
     prompt = NOTES_PROMPT.format(title=meta["title"], channel=meta["channel"],
-                                 duration=ytlearn.fmt_duration(meta["secs"]))
+                                 duration=ytlearn.fmt_duration(meta["secs"])) + WRITING_RULES
     out = subprocess.run(["claude", "-p", prompt, "--model", model],
                          input=transcript[:400000], capture_output=True, text=True, timeout=900)
     body = out.stdout.strip()
-    if not body:
-        raise RuntimeError(f"Notes failed for {meta['title']}: {out.stderr.strip()[:200]}")
+    if out.returncode != 0 or not body.startswith("## TL;DR"):
+        reason = (out.stderr.strip() or body).splitlines()[-1][:200] if (out.stderr.strip() or body) else "no output"
+        raise RuntimeError(f"Notes failed for {meta['title']}: {reason}")
     return save_note(meta, link_stamps(clean_glossary(body), vid))
 
 
@@ -282,8 +309,9 @@ def add_glossary(vid, model):
     md = path.read_text()
     if re.search(r"^## Glossary", md, re.M):
         return False
-    out = subprocess.run(["claude", "-p", GLOSSARY_PROMPT, "--model", model],
-                         input=md, capture_output=True, text=True, timeout=300).stdout.strip()
+    out = subprocess.run(["claude", "-p", GLOSSARY_PROMPT + WRITING_RULES, "--model", model],
+                         input=md, capture_output=True, text=True, timeout=300)
+    out = out.stdout.strip() if out.returncode == 0 else ""
     if not out.startswith("## Glossary"):
         return False
     out = clean_glossary(out)
@@ -339,7 +367,7 @@ def run_job(job, text, minutes, model):
 
 
 class Handler(BaseHTTPRequestHandler):
-    model = "sonnet"
+    model = DEFAULT_MODEL
 
     def log_message(self, *args):
         pass
@@ -441,7 +469,7 @@ def main():
     ap = argparse.ArgumentParser(description="Read YouTube videos instead of watching them.")
     ap.add_argument("input", nargs="?", help="YouTube URL or topic; omit to open the app")
     ap.add_argument("-t", "--time", type=int, default=60, help="minutes of video to cover for a topic")
-    ap.add_argument("--model", default="sonnet")
+    ap.add_argument("--model", default=DEFAULT_MODEL, help=f"Claude model for notes (default {DEFAULT_MODEL})")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true", help="don't open the browser")
     ap.add_argument("--lan", action="store_true", help="also serve on your local network, e.g. for your phone")

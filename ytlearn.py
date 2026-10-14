@@ -204,7 +204,7 @@ def main():
     ap.add_argument("--per-channel", type=int, default=1)
     ap.add_argument("--no-summary", action="store_true")
     ap.add_argument("--no-rank", action="store_true", help="skip AI picking, rank by views only")
-    ap.add_argument("--model", default="haiku")
+    ap.add_argument("--model", default="claude-haiku-5-5")
     ap.add_argument("-o", "--out", help="output markdown path")
     args = ap.parse_args()
 

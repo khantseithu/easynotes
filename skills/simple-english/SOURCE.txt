@@ -1,0 +1,6 @@
+Vendored from https://github.com/AminBlg/SimpleEnglish
+Commit: a6fcb4fde098b33617cc1578d151ebf58774b883 (skill version 2.1.1)
+License: MIT, see LICENSE in this folder.
+
+ytnotes.py reads the "## The Document" section of SKILL.md and adds it to the note and glossary prompts.
+To update, replace SKILL.md with a newer copy from upstream.
