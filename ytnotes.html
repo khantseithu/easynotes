@@ -96,9 +96,9 @@ svg { display: block; flex: none; }
          transition: border-color .15s, box-shadow .15s; }
 .field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .field textarea { flex: 1; min-width: 0; border: 0; background: none; outline: none; padding: 8px 0; font-size: 15px; line-height: 1.4;
-                  resize: none; max-height: 160px; overflow-y: auto; display: block; }
-.field textarea::placeholder { color: var(--faint); }
-.go { height: 36px; padding: 0 14px; border: 0; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 14px; white-space: nowrap; }
+                  resize: none; max-height: 160px; overflow-y: hidden; display: block; }
+.field textarea::placeholder { color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.go { width: 36px; height: 36px; flex: none; display: grid; place-items: center; padding: 0; border: 0; border-radius: 9px; background: var(--accent); color: var(--accent-ink); }
 .go:hover { filter: brightness(1.06); }
 .go:disabled { opacity: .45; cursor: default; filter: none; }
 .topic-row { display: none; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--muted); }
@@ -323,8 +323,10 @@ h1 { font-family: var(--sans); font-size: 30px; line-height: 1.18; letter-spacin
   <form class="composer" id="composer" autocomplete="off">
     <label class="vh" for="in">YouTube link or topic</label>
     <div class="field">
-      <textarea id="in" rows="1" placeholder="YouTube links, a playlist, or a topic" enterkeyhint="go"></textarea>
-      <button class="go" id="go" disabled>Make notes</button>
+      <textarea id="in" rows="1" placeholder="YouTube links or a topic" enterkeyhint="go"></textarea>
+      <button class="go" id="go" disabled aria-label="Make notes" title="Make notes (Enter)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
     </div>
     <div class="topic-row" id="topic-row">
       <span>Cover</span>
@@ -438,8 +440,9 @@ function renderSeg() {
 document.querySelector(".seg").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.minutes = +b.dataset.min; store.set("minutes", state.minutes); renderSeg(); };
 $("#in").addEventListener("input", () => {
   const el = $("#in"), v = el.value.trim();
-  el.style.height = "auto";
-  el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  el.style.height = "";
+  if (v) { el.style.height = Math.min(el.scrollHeight, 160) + "px"; }
+  el.style.overflowY = v && el.scrollHeight > 160 ? "auto" : "hidden";
   $("#go").disabled = !v;
   $("#topic-row").classList.toggle("on", !!v && !hasLink(v));
   const d = describeInput(v);
