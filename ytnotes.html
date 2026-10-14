@@ -8,7 +8,10 @@
 <meta name="theme-color" content="#23201c" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="YT Notes">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/assets/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="/assets/favicon-16.png" type="image/png" sizes="16x16">
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <title>YT Notes</title>
@@ -71,7 +74,7 @@
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; scroll-padding-top: 72px; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 svg { display: block; flex: none; }
@@ -89,11 +92,12 @@ svg { display: block; flex: none; }
 .close-side { display: none; }
 
 .composer { padding: 0 16px 16px; }
-.field { display: flex; align-items: center; gap: 6px; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 4px 4px 4px 12px;
+.field { display: flex; align-items: flex-end; gap: 6px; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 4px 4px 4px 12px;
          transition: border-color .15s, box-shadow .15s; }
 .field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.field input { flex: 1; min-width: 0; border: 0; background: none; outline: none; padding: 8px 0; font-size: 15px; }
-.field input::placeholder { color: var(--faint); }
+.field textarea { flex: 1; min-width: 0; border: 0; background: none; outline: none; padding: 8px 0; font-size: 15px; line-height: 1.4;
+                  resize: none; max-height: 160px; overflow-y: auto; display: block; }
+.field textarea::placeholder { color: var(--faint); }
 .go { height: 36px; padding: 0 14px; border: 0; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 14px; white-space: nowrap; }
 .go:hover { filter: brightness(1.06); }
 .go:disabled { opacity: .45; cursor: default; filter: none; }
@@ -124,6 +128,10 @@ svg { display: block; flex: none; }
 .job .m { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 4px; }
 .job.err { border-style: solid; border-color: var(--danger); }
 .job.err .m { color: var(--danger); }
+.job .bar { height: 3px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.job .bar i { display: block; height: 100%; background: var(--accent); transition: width .4s var(--ease); }
+.lib-label { padding: 14px 12px 4px; font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+.lib-label:first-child { padding-top: 4px; }
 .job .x { margin-left: auto; border: 0; background: none; color: var(--muted); font-size: 12px; padding: 2px 4px; }
 .spin { width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; flex: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -201,6 +209,29 @@ h1 { font-family: var(--sans); font-size: 30px; line-height: 1.18; letter-spacin
 .toc a:hover { color: var(--text); }
 .toc a.active { color: var(--accent); border-left-color: var(--accent); }
 
+.crumb { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); text-decoration: none; margin-bottom: 14px; max-width: 100%; }
+.crumb span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crumb:hover { color: var(--accent); }
+.videos { list-style: none; margin: 0; padding: 0; }
+.video { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 0 14px; padding: 22px 0; border-top: 1px solid var(--line); }
+.video:first-child { border-top: 0; }
+.video .num { font: 600 13px/1.6 var(--sans); color: var(--faint); font-variant-numeric: tabular-nums; padding-top: 1px; }
+.video h3 { margin: 0; font-size: 17px; line-height: 1.35; font-weight: 650; letter-spacing: -0.01em; }
+.video h3 button { all: unset; cursor: pointer; }
+.video h3 button:hover { color: var(--accent); }
+.video h3 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.video .vm { font-size: 13px; color: var(--muted); margin: 4px 0 10px; }
+.video p { font-family: var(--serif); font-size: 16.5px; line-height: 1.6; margin: 0; }
+.video.pending h3, .video.skipped h3 { color: var(--muted); font-weight: 560; }
+.video .st { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-top: 6px; }
+.video.skipped .st { color: var(--danger); }
+.col-note { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
+.pager { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); font-family: var(--sans); }
+.pager a { display: block; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; text-decoration: none; color: var(--text); background: var(--raised); }
+.pager a:hover { border-color: var(--accent); }
+.pager small { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.pager b { font-weight: 600; font-size: 14px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pager .next { grid-column: 2; text-align: right; }
 .welcome { padding: 18vh 0 40px; max-width: 46ch; }
 .welcome h1 { font-size: 28px; margin-bottom: 12px; }
 .welcome p { color: var(--muted); font-size: 16px; line-height: 1.6; margin: 0 0 20px; }
@@ -262,6 +293,8 @@ h1 { font-family: var(--sans); font-size: 30px; line-height: 1.18; letter-spacin
   .md h3 .ts { display: inline-block; margin: 4px 0 0; vertical-align: 0; }
   .md h2 { margin-top: 44px; }
   .glossary { grid-template-columns: 1fr; }
+  .pager { grid-template-columns: 1fr; }
+  .pager .next { grid-column: 1; }
   .glossary dt { padding-bottom: 2px; }
   .glossary dd { border-top: 0; padding-top: 0; }
   .player { padding-left: 12px; padding-right: 12px; }
@@ -270,7 +303,7 @@ h1 { font-family: var(--sans); font-size: 30px; line-height: 1.18; letter-spacin
   .actions #listen { flex: 1 1 100%; justify-content: center; height: 44px; }
   .actions .voice { flex: 1; height: 42px; }
   .actions .btn:not(.primary) { height: 42px; }
-  .field input { font-size: 16px; }
+  .field textarea { font-size: 16px; }
   .filter input { font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -290,7 +323,7 @@ h1 { font-family: var(--sans); font-size: 30px; line-height: 1.18; letter-spacin
   <form class="composer" id="composer" autocomplete="off">
     <label class="vh" for="in">YouTube link or topic</label>
     <div class="field">
-      <input id="in" placeholder="YouTube link or topic" enterkeyhint="go">
+      <textarea id="in" rows="1" placeholder="YouTube links, a playlist, or a topic" enterkeyhint="go"></textarea>
       <button class="go" id="go" disabled>Make notes</button>
     </div>
     <div class="topic-row" id="topic-row">
@@ -360,7 +393,14 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 const api = async (url, opts) => { const r = await fetch(url, opts); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText); return j; };
-const isUrl = s => /(youtu\.be\/|youtube\.com\/|^[\w-]{11}$)/.test(s.trim());
+const LINK_RE = /(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com|youtu\.be)\/\S+/g;
+const hasLink = s => (s.match(LINK_RE) || []).length > 0 || /^[\w-]{11}$/.test(s.trim());
+function describeInput(s) {
+  const links = s.match(LINK_RE) || [];
+  const lists = links.filter(l => /\/playlist\?/.test(l)).length, vids = links.length - lists;
+  const part = (n, w) => n ? `${n} ${w}${n > 1 ? "s" : ""}` : "";
+  return [part(lists, "playlist"), part(vids, "video")].filter(Boolean).join(" and ");
+}
 const ICON = {
   play: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>`,
   pause: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`,
@@ -373,7 +413,7 @@ const ICON = {
 const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
 const EXAMPLES = ["saas distribution", "founder-led sales", "pricing strategy", "product-led growth"];
 
-const state = { notes: [], voices: [], current: null, note: null, jobs: [], minutes: store.get("minutes", 60), q: "", playing: null };
+const state = { notes: [], collections: [], voices: [], current: null, note: null, jobs: [], minutes: store.get("minutes", 60), q: "", playing: null };
 
 function applyTheme() {
   const t = store.get("theme", "system");
@@ -397,41 +437,101 @@ function renderSeg() {
 }
 document.querySelector(".seg").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.minutes = +b.dataset.min; store.set("minutes", state.minutes); renderSeg(); };
 $("#in").addEventListener("input", () => {
-  const v = $("#in").value.trim();
+  const el = $("#in"), v = el.value.trim();
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 160) + "px";
   $("#go").disabled = !v;
-  $("#topic-row").classList.toggle("on", !!v && !isUrl(v));
-  $("#hint").textContent = "";
+  $("#topic-row").classList.toggle("on", !!v && !hasLink(v));
+  const d = describeInput(v);
+  $("#hint").textContent = d && (d.includes(" and ") || /playlist|\d+ videos/.test(d)) ? `Notes for ${d}` : "";
   $("#hint").className = "hint";
+});
+$("#in").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#composer").requestSubmit(); }
 });
 $("#q").addEventListener("input", e => { state.q = e.target.value.toLowerCase(); renderList(); });
 
 function renderList() {
-  const notes = state.notes.filter(n => !state.q || (n.title + " " + n.channel).toLowerCase().includes(state.q));
+  const match = x => !state.q || (x.title + " " + x.channel).toLowerCase().includes(state.q);
+  const notes = state.notes.filter(match);
+  const cols = state.collections.filter(match);
   const saved = state.notes.reduce((a, n) => a + Math.max(0, n.secs - n.read_mins * 60), 0);
   $("#lib-stats").textContent = state.notes.length ? `${state.notes.length} notes${saved ? ` · ${dur(saved)} saved` : ""}` : "";
   $("#filter").classList.toggle("on", state.notes.length > 5);
   const jobs = state.jobs.map(j => `
     <li class="job ${j.status === "error" ? "err" : ""}">
-      <div class="t">${esc(j.label)}</div>
+      <div class="t">${esc(j.title || j.label)}</div>
       <div class="m">${j.status === "error" ? "" : `<div class="spin"></div>`}<span>${esc(j.message)}</span>
         ${j.status === "error" ? `<button class="x" data-dismiss="${j.id}">Dismiss</button>` : ""}</div>
+      ${j.total > 1 && j.status !== "error" ? `<div class="bar"><i style="width:${Math.round(100 * (j.done || 0) / j.total)}%"></i></div>` : ""}
     </li>`).join("");
+  const colItems = cols.map(c => `
+    <li><button class="item" data-col="${esc(c.id)}" aria-current="${state.current === "c:" + c.id}">
+      <div class="t">${esc(c.title)}</div>
+      <div class="m"><span>${c.kind === "playlist" ? "Playlist" : "Topic"}</span><span class="dot">${c.ready < c.count ? `${c.ready} of ${c.count} notes` : `${c.count} videos`}</span>${
+        c.read_mins ? `<span class="dot">${c.read_mins} min read</span>` : ""}</div>
+    </button></li>`).join("");
   const items = notes.map(n => `
     <li><button class="item" data-id="${n.id}" aria-current="${n.id === state.current}">
       <div class="t">${esc(n.title)}</div>
       <div class="m"><span>${esc(n.channel)}</span><span class="dot">${n.read_mins} min read</span>${
         state.playing === n.id ? `<span class="dot playing">Playing</span>` : n.audio ? `<span class="dot">Audio</span>` : ""}</div>
     </button></li>`).join("");
-  $("#list").innerHTML = jobs + (items || (state.jobs.length ? "" : `<li class="empty-lib">${state.q ? "No notes match." : "Notes you make will appear here."}</li>`));
+  const sections = colItems ? `<li class="lib-label">Playlists and topics</li>${colItems}${items ? `<li class="lib-label">Notes</li>${items}` : ""}` : items;
+  $("#list").innerHTML = jobs + (sections || (state.jobs.length ? "" : `<li class="empty-lib">${state.q ? "No notes match." : "Notes you make will appear here."}</li>`));
 }
 $("#list").onclick = e => {
   const d = e.target.closest("[data-dismiss]");
   if (d) { state.jobs = state.jobs.filter(j => j.id !== d.dataset.dismiss); return renderList(); }
+  const c = e.target.closest("[data-col]");
+  if (c) { openCollection(c.dataset.col); side(false); return; }
   const b = e.target.closest(".item");
   if (b) { openNote(b.dataset.id); side(false); }
 };
 
 async function loadNotes() { state.notes = await api("/api/notes"); renderList(); }
+async function loadCollections() { state.collections = await api("/api/collections"); renderList(); }
+
+async function openCollection(id, quiet) {
+  const key = "c:" + id;
+  const fresh = state.current !== key;
+  state.current = key; state.note = null;
+  history.replaceState(null, "", `#c/${id}`);
+  renderList();
+  if (!quiet) $("#view").innerHTML = `<div style="padding-top:24px"><div class="sk" style="width:30%"></div><div class="sk" style="height:30px;width:70%"></div><div class="sk"></div><div class="sk" style="width:85%"></div></div>`;
+  let c;
+  try { c = await api(`/api/collections/${encodeURIComponent(id)}`); } catch { return welcome(); }
+  if (state.current !== key) return;
+  const ready = c.items.filter(i => i.status === "ready");
+  const secs = c.items.reduce((a, i) => a + (i.secs || 0), 0);
+  const readMins = ready.reduce((a, i) => a + i.read_mins, 0);
+  const label = c.kind === "playlist" ? "Playlist" : "Topic";
+  $("#layout").classList.remove("has-toc");
+  $("#toc").innerHTML = "";
+  $("#top-title").textContent = c.title;
+  document.title = `${c.title} · YT Notes`;
+  const playAll = `https://www.youtube.com/watch_videos?video_ids=${c.items.slice(0, 50).map(i => i.id).join(",")}`;
+  $("#view").innerHTML = `
+    <div class="kicker"><span>${label}</span>${c.channel ? `<span>${esc(c.channel)}</span>` : ""}<span>${c.items.length} videos</span>${secs ? `<span>${dur(secs)} of video</span>` : ""}${readMins ? `<span class="saved">${readMins} min read</span>` : ""}</div>
+    <h1>${esc(c.title)}</h1>
+    <div class="actions">
+      ${ready.length ? `<button class="btn primary" data-open="${ready[0].id}"><span>Start reading</span></button>` : ""}
+      <a class="btn" href="${esc(c.url || playAll)}" target="_blank" rel="noopener">${ICON.ext}<span>${c.kind === "playlist" ? "Open playlist" : "Play on YouTube"}</span></a>
+    </div>
+    ${c.total > c.items.length ? `<p class="col-note">The playlist has ${c.total} videos. YT Notes reads the first ${c.items.length}.</p>` : ""}
+    <ol class="videos">${c.items.map((i, k) => `
+      <li class="video ${i.status}">
+        <div class="num">${k + 1}</div>
+        <div>
+          <h3>${i.status === "ready" ? `<button data-open="${i.id}">${esc(i.title)}</button>` : esc(i.title)}</h3>
+          ${i.status === "ready" ? `<div class="vm">${esc(i.channel)} · ${dur(i.secs)} video · ${i.read_mins} min read${i.audio ? " · Audio" : ""}</div><p>${esc(i.tldr)}</p>`
+            : i.status === "skipped" ? `<div class="st">Skipped: ${esc(i.reason)}</div>`
+            : `<div class="st"><div class="spin"></div>${i.secs ? `${dur(i.secs)} video · ` : ""}Writing notes…</div>`}
+        </div>
+      </li>`).join("")}
+    </ol>`;
+  if (fresh && !quiet) scrollTo({ top: 0 });
+}
 
 function welcome() {
   state.current = null; state.note = null;
@@ -442,12 +542,14 @@ function welcome() {
     <div class="welcome">
       <img class="mark" src="/assets/icon.svg" alt="">
       <h1>Read the video instead of watching it.</h1>
-      <p>Paste a YouTube link to get notes you can read in a few minutes, with timestamps, a glossary and an audio version. Or type a topic and it picks the best videos for you.</p>
+      <p>Paste a YouTube link to get notes you can read in a few minutes, with timestamps, a glossary and an audio version. Paste several links or a playlist to read them as a set. Or type a topic and it picks the best videos for you.</p>
       <div class="chips">${EXAMPLES.map(t => `<button class="chip" data-topic="${esc(t)}">${esc(t)}</button>`).join("")}</div>
     </div>`;
   renderList();
 }
 $("#view").addEventListener("click", e => {
+  const o = e.target.closest("[data-open]");
+  if (o) { openNote(o.dataset.open); return; }
   const c = e.target.closest("[data-topic]");
   if (!c) return;
   if (mq.matches) side(true);
@@ -591,14 +693,21 @@ async function openNote(id) {
   if (state.current !== id) return;
   state.note = n;
   const saved = Math.max(0, n.secs - n.read_mins * 60);
+  const col = n.collections?.[0];
   $("#top-title").textContent = n.title;
   document.title = `${n.title} · YT Notes`;
   $("#view").innerHTML = `
+    ${col ? `<a class="crumb" href="#c/${esc(col.id)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg><span>${esc(col.title)}</span><span>· ${col.index} of ${col.count}</span></a>` : ""}
     <div class="kicker"><span>${esc(n.channel)}</span><span>${dur(n.secs)} video</span><span>${n.read_mins} min read</span>${saved ? `<span class="saved">${dur(saved)} saved</span>` : ""}</div>
     <h1>${esc(n.title)}</h1>
     <div class="actions" id="actions"></div>
-    <div class="md" id="md">${DOMPurify.sanitize(marked.parse(n.markdown))}</div>`;
+    <div class="md" id="md">${DOMPurify.sanitize(marked.parse(n.markdown))}</div>
+    ${col && (col.prev || col.next) ? `<nav class="pager" aria-label="${esc(col.title)}">
+      ${col.prev ? `<a class="prev" href="#${col.prev.id}"><small>Previous</small><b>${esc(col.prev.title)}</b></a>` : ""}
+      ${col.next ? `<a class="next" href="#${col.next.id}"><small>Next</small><b>${esc(col.next.title)}</b></a>` : ""}
+    </nav>` : ""}`;
   enhance($("#md"), n);
+  $("#view").querySelectorAll(".crumb, .pager a").forEach(a => { a.removeAttribute("target"); a.removeAttribute("rel"); });
   renderActions();
   buildToc();
   scrollTo({ top: 0 });
@@ -726,15 +835,24 @@ $("#composer").addEventListener("submit", async e => {
     while (j.status === "running") {
       await new Promise(r => setTimeout(r, 1500));
       j = await api(`/api/jobs/${j.id}`);
-      job.message = j.message;
-      if (j.ids.length > shown) { shown = j.ids.length; await loadNotes(); if (shown === 1 && !state.current) openNote(j.ids[0]); }
+      Object.assign(job, { message: j.message, title: j.title, total: j.total, done: j.done });
+      const colId = j.collections?.[0];
+      if (colId && !job.opened) { job.opened = true; await loadCollections(); openCollection(colId); }
+      if (j.ids.length > shown) {
+        shown = j.ids.length;
+        await Promise.all([loadNotes(), colId ? loadCollections() : null]);
+        if (colId && state.current === "c:" + colId) openCollection(colId, true);
+        else if (!colId && shown === 1 && !state.current) openNote(j.ids[0]);
+      }
       renderList();
     }
-    await loadNotes();
-    if (j.status === "error") throw new Error(j.message);
+    await Promise.all([loadNotes(), loadCollections()]);
+    const colId = j.collections?.[0];
+    if (j.status === "error") { if (colId && state.current === "c:" + colId) openCollection(colId, true); throw new Error(j.message); }
     state.jobs = state.jobs.filter(x => x !== job);
     renderList();
-    if (j.ids.length) openNote(j.ids[0]);
+    if (colId) { if (state.current === "c:" + colId) openCollection(colId, true); }
+    else if (j.ids.length) openNote(j.ids[0]);
     if (/skipped/.test(j.message)) { $("#hint").textContent = j.message; $("#hint").className = "hint err"; }
   } catch (err) {
     job.status = "error";
@@ -749,16 +867,21 @@ addEventListener("scroll", () => {
   if ((y > 80) !== (lastY > 80)) $("#topbar").classList.toggle("scrolled", y > 80);
   lastY = y;
 }, { passive: true });
-addEventListener("hashchange", () => { const id = location.hash.slice(1); if (/^[\w-]{11}$/.test(id) && id !== state.current) openNote(id); });
+function route() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (h.startsWith("c/")) { if (state.current !== "c:" + h.slice(2)) openCollection(h.slice(2)); return true; }
+  if (/^[\w-]{11}$/.test(h) && state.notes.some(n => n.id === h)) { if (state.current !== h) openNote(h); return true; }
+  return false;
+}
+addEventListener("hashchange", route);
 
 applyTheme();
 renderSeg();
 $("#p-speed").textContent = `${store.get("speed", 1)}×`;
 syncPlayer();
-Promise.all([api("/api/voices").then(v => { state.voices = v; }), loadNotes()]).then(() => {
-  const id = location.hash.slice(1);
-  if (state.notes.some(n => n.id === id)) openNote(id);
-  else if (state.notes.length) openNote(state.notes[0].id);
+Promise.all([api("/api/voices").then(v => { state.voices = v; }), loadNotes(), loadCollections()]).then(() => {
+  if (route()) return;
+  if (state.notes.length) openNote(state.notes[0].id);
   else welcome();
 });
 </script>
