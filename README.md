@@ -145,6 +145,7 @@ The project has these files and folders:
 | `ytnotes.html` | The app that opens in the browser. |
 | `tts.py` | The script that records audio with Kokoro. |
 | `ytlearn.py` | The video search and the playlist builder. |
+| `ROADMAP.md` | Ideas for improving tutorial notes. |
 | `context.py` | The code that gets chapters and reads the repos and docs that a video links to. |
 | `llm.py` | The code that sends prompts to pi or Claude Code. |
 | `skills/simple-english/` | A copy of the simple-english skill, with its license and source. |
