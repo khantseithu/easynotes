@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "ytnotes", "runtimeExecutable": "python3", "runtimeArgs": ["ytnotes.py", "--no-open"], "port": 8765 }
+  ]
+}

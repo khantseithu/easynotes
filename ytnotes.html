@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YT Notes</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<style>
+:root {
+  --bg: #fbfaf7; --panel: #f3f1ec; --line: #e4e0d8; --text: #1f1d1a; --muted: #6f6a62;
+  --accent: #c2410c; --accent-soft: #fbe9df; --card: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #161513; --panel: #1d1c19; --line: #2e2c28; --text: #ece8e1; --muted: #9a948a;
+          --accent: #fb923c; --accent-soft: #3a2416; --card: #22211e; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+       font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; }
+.app { display: grid; grid-template-columns: 340px 1fr; height: 100vh; }
+aside { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.brand { padding: 20px 20px 4px; font-weight: 700; letter-spacing: -0.01em; font-size: 17px; }
+.brand span { color: var(--accent); }
+.tag { padding: 0 20px 14px; color: var(--muted); font-size: 13px; }
+form { padding: 0 16px 16px; border-bottom: 1px solid var(--line); }
+textarea { width: 100%; resize: none; height: 64px; padding: 10px 12px; border-radius: 10px;
+           border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; }
+textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+select { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; }
+button { padding: 8px 16px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+.status { margin-top: 10px; font-size: 13px; color: var(--muted); display: none; align-items: center; gap: 8px; }
+.status.on { display: flex; }
+.status.err { color: #dc2626; }
+.spin { width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: s 0.8s linear infinite; flex: none; }
+@keyframes s { to { transform: rotate(360deg); } }
+.lib-h { padding: 14px 20px 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: flex; justify-content: space-between; }
+.list { overflow-y: auto; flex: 1; padding: 0 8px 16px; }
+.item { padding: 10px 12px; border-radius: 10px; cursor: pointer; }
+.item:hover { background: var(--line); }
+.item.active { background: var(--accent-soft); }
+.item .t { font-weight: 600; font-size: 14px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.item .m { color: var(--muted); font-size: 12px; margin-top: 3px; }
+main { overflow-y: auto; min-height: 0; }
+article { max-width: 720px; margin: 0 auto; padding: 48px 32px 96px; }
+.empty { color: var(--muted); text-align: center; padding-top: 22vh; }
+.empty b { color: var(--text); display: block; font-size: 20px; margin-bottom: 6px; }
+.meta { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.saved { background: var(--accent-soft); color: var(--accent); padding: 2px 10px; border-radius: 99px; font-weight: 600; font-size: 13px; }
+h1 { font-size: 30px; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 10px; }
+.md { font-size: 16.5px; line-height: 1.7; }
+.md h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin: 40px 0 10px; }
+.md h3 { font-size: 19px; line-height: 1.35; margin: 28px 0 6px; letter-spacing: -0.01em; }
+.md h3 a { font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: none; margin-left: 6px; padding: 1px 7px; border: 1px solid var(--line); border-radius: 6px; white-space: nowrap; }
+.md h3 a:hover { color: var(--accent); border-color: var(--accent); }
+.md a { color: var(--accent); }
+.md ul { padding-left: 22px; }
+.md li { margin: 4px 0; }
+.md li:has(> input[type=checkbox]) { list-style: none; margin-left: -22px; padding-left: 26px; text-indent: -26px; }
+.md input[type=checkbox] { accent-color: var(--accent); margin-right: 8px; }
+.md blockquote { margin: 14px 0; padding: 4px 18px; border-left: 3px solid var(--accent); color: var(--muted); font-style: italic; }
+.md h2:first-child { margin-top: 28px; }
+.md code { background: var(--panel); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+.listen { position: sticky; top: 0; z-index: 2; margin: 20px -12px 0; padding: 10px 12px; background: var(--bg);
+          border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.listen select { flex: 0 1 auto; padding: 6px 8px; font-size: 13px; }
+.listen audio { flex: 1 1 260px; height: 36px; min-width: 0; }
+.listen .ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 6px 12px; font-size: 13px; }
+.listen .msg { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.listen .msg.err { color: #dc2626; }
+.item .m .a { color: var(--accent); }
+@media (max-width: 800px) {
+  .app { grid-template-columns: 1fr; height: auto; }
+  aside { border-right: 0; border-bottom: 1px solid var(--line); }
+  .list { max-height: 40vh; }
+  article { padding: 28px 16px 64px; }
+  h1 { font-size: 24px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand">YT <span>Notes</span></div>
+    <div class="tag">Read the video instead of watching it.</div>
+    <form id="f">
+      <textarea id="in" placeholder="Paste a YouTube link, or type a topic to learn"></textarea>
+      <div class="row">
+        <select id="mins" title="For topics: how much video to cover">
+          <option value="30">Topic: ~30 min of video</option>
+          <option value="60" selected>Topic: ~1 hr of video</option>
+          <option value="120">Topic: ~2 hrs of video</option>
+          <option value="240">Topic: ~4 hrs of video</option>
+        </select>
+        <button id="go">Make notes</button>
+      </div>
+      <div class="status" id="st"><div class="spin"></div><span></span></div>
+    </form>
+    <div class="lib-h"><span>Library</span><span id="saved-total"></span></div>
+    <div class="list" id="list"></div>
+  </aside>
+  <main><article id="view"><div class="empty"><b>No note open</b>Paste a link on the left. A 1-hour video usually becomes a 5-minute read.</div></article></main>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const fmt = s => { const m = Math.round(s / 60), h = Math.floor(m / 60); return h ? `${h}h ${String(m % 60).padStart(2, "0")}m` : `${m}m`; };
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let notes = [], current = null;
+
+async function loadList() {
+  notes = await (await fetch("/api/notes")).json();
+  const saved = notes.reduce((a, n) => a + Math.max(0, n.secs - n.read_mins * 60), 0);
+  $("#saved-total").textContent = saved ? `${fmt(saved)} saved` : "";
+  $("#list").innerHTML = notes.map(n => `
+    <div class="item ${n.id === current ? "active" : ""}" data-id="${n.id}">
+      <div class="t">${esc(n.title)}</div>
+      <div class="m">${esc(n.channel)} · ${fmt(n.secs)} → ${n.read_mins} min read${n.audio ? ` · <span class="a">audio</span>` : ""}</div>
+    </div>`).join("") || `<div class="item"><div class="m">Your notes will show up here.</div></div>`;
+}
+
+async function openNote(id) {
+  current = id;
+  location.hash = id;
+  document.querySelectorAll(".item").forEach(el => el.classList.toggle("active", el.dataset.id === id));
+  const n = await (await fetch(`/api/notes/${id}`)).json();
+  const saved = Math.max(0, n.secs - n.read_mins * 60);
+  $("#view").innerHTML = `
+    <h1>${esc(n.title)}</h1>
+    <div class="meta">
+      <span>${esc(n.channel)}</span>
+      <span>${fmt(n.secs)} video · ${n.read_mins} min read</span>
+      ${saved ? `<span class="saved">${fmt(saved)} saved</span>` : ""}
+      <a href="https://youtu.be/${n.id}" target="_blank" rel="noopener" style="color:var(--accent)">Watch ↗</a>
+    </div>
+    <div class="listen" id="listen"></div>
+    <div class="md">${DOMPurify.sanitize(marked.parse(n.markdown), { ADD_ATTR: ["target"] })}</div>`;
+  $("#view").querySelectorAll(".md a").forEach(a => { a.target = "_blank"; a.rel = "noopener"; });
+  renderListen(n);
+  document.querySelector("main").scrollTop = 0;
+}
+
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
+                set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+let voices = [];
+const voiceSelect = sel => `<select id="voice" title="Voice">${voices.map(v =>
+  `<option value="${v.id}" ${v.id === sel ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select>`;
+
+function renderListen(n, msg, kind) {
+  const voice = store.get("voice", voices[0]?.id);
+  const has = n.audio && n.audio.voice === voice;
+  const speed = store.get("speed", "1");
+  $("#listen").innerHTML = has
+    ? `<audio id="player" controls preload="metadata" src="/audio/${n.id}.m4a?v=${n.audio.voice}"></audio>
+       <select id="speed" title="Speed">${["1", "1.25", "1.5", "1.75", "2"].map(s =>
+         `<option value="${s}" ${s === speed ? "selected" : ""}>${s}×</option>`).join("")}</select>
+       ${voiceSelect(voice)}`
+    : msg
+      ? `<div class="msg ${kind === "err" ? "err" : ""}">${kind === "err" ? "" : `<div class="spin"></div>`}${esc(msg)}</div>
+         ${kind === "err" ? `<button class="ghost" id="mk">Try again</button>` : ""}`
+      : `<button class="ghost" id="mk">▶ Listen to these notes</button>${voiceSelect(voice)}
+         ${n.audio ? `<span class="msg">Recorded in another voice</span>` : `<span class="msg">~${Math.max(1, Math.round(n.read_mins * 1.3))} min · made locally with Kokoro</span>`}`;
+  const player = $("#player");
+  if (player) {
+    player.playbackRate = +speed;
+    player.addEventListener("loadedmetadata", () => { player.playbackRate = +store.get("speed", "1"); });
+    $("#speed").onchange = e => { store.set("speed", e.target.value); player.playbackRate = +e.target.value; };
+  }
+  const vs = $("#voice");
+  if (vs) vs.onchange = e => { store.set("voice", e.target.value); renderListen(n); };
+  const mk = $("#mk");
+  if (mk) mk.onclick = () => makeAudio(n);
+}
+
+async function makeAudio(n) {
+  const voice = store.get("voice", voices[0]?.id);
+  renderListen(n, "Starting…");
+  let job = await (await fetch(`/api/audio/${n.id}`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ voice }) })).json();
+  while (job.status === "running") {
+    await new Promise(r => setTimeout(r, 1000));
+    job = await (await fetch(`/api/jobs/${job.id}`)).json();
+    if (current === n.id) renderListen(n, job.message);
+  }
+  await loadList();
+  if (current !== n.id) return;
+  if (job.status === "error") return renderListen(n, job.message, "err");
+  const fresh = await (await fetch(`/api/notes/${n.id}`)).json();
+  renderListen(fresh);
+  $("#player")?.play().catch(() => {});
+}
+
+$("#list").addEventListener("click", e => { const el = e.target.closest(".item[data-id]"); if (el) openNote(el.dataset.id); });
+
+function status(msg, kind) {
+  const st = $("#st");
+  st.className = "status on" + (kind === "err" ? " err" : "");
+  st.querySelector(".spin").style.display = kind ? "none" : "";
+  st.querySelector("span").textContent = msg;
+}
+
+$("#in").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#f").requestSubmit(); } });
+
+$("#f").addEventListener("submit", async e => {
+  e.preventDefault();
+  const input = $("#in").value.trim();
+  if (!input) return;
+  $("#go").disabled = true;
+  status("Starting…");
+  const res = await fetch("/api/jobs", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input, minutes: +$("#mins").value }) });
+  let job = await res.json();
+  if (!res.ok) { status(job.error, "err"); $("#go").disabled = false; return; }
+  let shown = 0;
+  while (job.status === "running") {
+    await new Promise(r => setTimeout(r, 1500));
+    job = await (await fetch(`/api/jobs/${job.id}`)).json();
+    status(job.message);
+    if (job.ids.length > shown) { shown = job.ids.length; await loadList(); if (shown === 1) openNote(job.ids[0]); }
+  }
+  await loadList();
+  if (job.ids.length && !shown) openNote(job.ids[0]);
+  status(job.message, job.status === "error" ? "err" : "done");
+  if (job.status === "done") $("#in").value = "";
+  $("#go").disabled = false;
+});
+
+fetch("/api/voices").then(r => r.json()).then(v => { voices = v; return loadList(); }).then(() => { const id = location.hash.slice(1) || notes[0]?.id; if (id) openNote(id); });
+</script>
+</body>
+</html>
