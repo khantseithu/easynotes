@@ -58,6 +58,8 @@ Each playlist and each topic becomes a collection in the library. A collection p
 
 To listen to a note, select Listen. The first recording of a note takes about one minute. After that, the audio starts immediately. The player continues while you read other notes, and it remembers your position in each note.
 
+To delete a note, select the trash button next to Listen, and then select Delete. The app removes the note and its audio. You can't undo this. The Chrome extension has the same button.
+
 Glossary terms have a dotted underline in the text. Select a term to see what it means. The full glossary is at the end of each note.
 
 ## Use the app on your phone
