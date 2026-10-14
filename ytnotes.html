@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#faf8f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#23201c" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="YT Notes">
+<link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
 <title>YT Notes</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
@@ -17,7 +24,7 @@
   --text: oklch(0.25 0.012 70);
   --muted: oklch(0.5 0.012 70);
   --faint: oklch(0.64 0.01 70);
-  --accent: oklch(0.5 0.13 268);
+  --accent: oklch(0.47 0.14 267);
   --accent-ink: oklch(0.985 0.006 268);
   --accent-soft: oklch(0.935 0.035 268);
   --danger: oklch(0.53 0.17 27);
@@ -38,7 +45,7 @@
     --text: oklch(0.87 0.012 80);
     --muted: oklch(0.67 0.012 75);
     --faint: oklch(0.55 0.01 75);
-    --accent: oklch(0.76 0.1 268);
+    --accent: oklch(0.76 0.09 272);
     --accent-ink: oklch(0.2 0.02 268);
     --accent-soft: oklch(0.3 0.045 268);
     --danger: oklch(0.72 0.14 27);
@@ -54,7 +61,7 @@
   --text: oklch(0.87 0.012 80);
   --muted: oklch(0.67 0.012 75);
   --faint: oklch(0.55 0.01 75);
-  --accent: oklch(0.76 0.1 268);
+  --accent: oklch(0.76 0.09 272);
   --accent-ink: oklch(0.2 0.02 268);
   --accent-soft: oklch(0.3 0.045 268);
   --danger: oklch(0.72 0.14 27);
@@ -73,8 +80,10 @@ svg { display: block; flex: none; }
 .sidebar { position: fixed; inset: 0 auto 0 0; width: var(--side-w); background: var(--side); border-right: 1px solid var(--line);
            display: flex; flex-direction: column; z-index: 30; padding-bottom: var(--player-h); }
 .side-head { display: flex; align-items: center; gap: 8px; padding: 18px 16px 12px 20px; }
-.brand { font-weight: 650; letter-spacing: -0.01em; font-size: 16px; margin-right: auto; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -0.01em; font-size: 16px; margin-right: auto; }
+.brand img { width: 26px; height: 26px; display: block; }
 .brand b { color: var(--accent); font-weight: 650; }
+.welcome .mark { width: 64px; height: 64px; display: block; margin-bottom: 24px; }
 .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 9px; background: transparent; color: var(--muted); }
 .icon-btn:hover { background: var(--hover); color: var(--text); }
 .close-side { display: none; }
@@ -272,7 +281,7 @@ h1 { font-family: var(--sans); font-size: 30px; line-height: 1.18; letter-spacin
 <body>
 <aside class="sidebar" id="sidebar" aria-label="Library">
   <div class="side-head">
-    <div class="brand">YT <b>Notes</b></div>
+    <div class="brand"><img src="/assets/icon.svg" alt=""><span>YT <b>Notes</b></span></div>
     <button class="icon-btn" id="theme" aria-label="Change theme"></button>
     <button class="icon-btn close-side" id="close-side" aria-label="Close library">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -431,6 +440,7 @@ function welcome() {
   $("#top-title").textContent = "";
   $("#view").innerHTML = `
     <div class="welcome">
+      <img class="mark" src="/assets/icon.svg" alt="">
       <h1>Read the video instead of watching it.</h1>
       <p>Paste a YouTube link to get notes you can read in a few minutes, with timestamps, a glossary and an audio version. Or type a topic and it picks the best videos for you.</p>
       <div class="chips">${EXAMPLES.map(t => `<button class="chip" data-topic="${esc(t)}">${esc(t)}</button>`).join("")}</div>

@@ -384,6 +384,13 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             f = NOTES / f"{m.group(1)}.m4a"
             return self.send_file(f, "audio/mp4") if f.exists() else self.send(404, {"error": "not found"})
+        if self.path == "/manifest.webmanifest":
+            return self.send(200, (ROOT / "manifest.webmanifest").read_bytes(), "application/manifest+json")
+        m = re.fullmatch(r"/assets/([\w-]+\.(svg|png))", self.path)
+        if m:
+            f = ROOT / "assets" / m.group(1)
+            ctype = "image/svg+xml" if m.group(2) == "svg" else "image/png"
+            return self.send(200, f.read_bytes(), ctype) if f.exists() else self.send(404, {"error": "not found"})
         if self.path == "/":
             return self.send(200, (ROOT / "ytnotes.html").read_bytes(), "text/html; charset=utf-8")
         if self.path == "/api/notes":
