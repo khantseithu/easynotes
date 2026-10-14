@@ -15,12 +15,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
+import llm
 import ytlearn
 
 ROOT = Path(__file__).resolve().parent
 NOTES = ROOT / "notes"
 INDEX = NOTES / "index.json"
-DEFAULT_MODEL = "claude-haiku-5-5"
+DEFAULT_MODEL = llm.DEFAULT_MODEL
 LOCK = threading.Lock()
 TTS_LOCK = threading.Lock()
 JOBS = {}
@@ -224,8 +225,7 @@ def make_notes(vid, model, log=print):
     log(f"Writing notes: {meta['title']}")
     prompt = NOTES_PROMPT.format(title=meta["title"], channel=meta["channel"],
                                  duration=ytlearn.fmt_duration(meta["secs"])) + WRITING_RULES
-    out = subprocess.run(["claude", "-p", prompt, "--model", model],
-                         input=transcript[:400000], capture_output=True, text=True, timeout=900)
+    out = llm.run(prompt, model, transcript[:400000])
     body = out.stdout.strip()
     if out.returncode != 0 or not body.startswith("## TL;DR"):
         reason = (out.stderr.strip() or body).splitlines()[-1][:200] if (out.stderr.strip() or body) else "no output"
@@ -309,8 +309,7 @@ def add_glossary(vid, model):
     md = path.read_text()
     if re.search(r"^## Glossary", md, re.M):
         return False
-    out = subprocess.run(["claude", "-p", GLOSSARY_PROMPT + WRITING_RULES, "--model", model],
-                         input=md, capture_output=True, text=True, timeout=300)
+    out = llm.run(GLOSSARY_PROMPT + WRITING_RULES, model, md, timeout=300)
     out = out.stdout.strip() if out.returncode == 0 else ""
     if not out.startswith("## Glossary"):
         return False
@@ -469,7 +468,8 @@ def main():
     ap = argparse.ArgumentParser(description="Read YouTube videos instead of watching them.")
     ap.add_argument("input", nargs="?", help="YouTube URL or topic; omit to open the app")
     ap.add_argument("-t", "--time", type=int, default=60, help="minutes of video to cover for a topic")
-    ap.add_argument("--model", default=DEFAULT_MODEL, help=f"Claude model for notes (default {DEFAULT_MODEL})")
+    ap.add_argument("--model", default=DEFAULT_MODEL,
+                    help=f"pi model as provider/model (default {DEFAULT_MODEL}), or a Claude model such as claude-haiku-5-5")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true", help="don't open the browser")
     ap.add_argument("--lan", action="store_true", help="also serve on your local network, e.g. for your phone")

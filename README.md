@@ -23,7 +23,7 @@ YT Notes runs on macOS. The audio feature needs a Mac with Apple silicon. Instal
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp), which gets the video data and the captions.
 - [uv](https://docs.astral.sh/uv/), which runs the transcript fallback and the audio engine in separate environments.
 - [ffmpeg](https://ffmpeg.org/), which compresses the audio.
-- The [Claude Code](https://claude.com/claude-code) CLI (`claude`), which writes the notes. You must sign in to it once.
+- The [pi](https://github.com/earendil-works/pi) CLI (`pi`), which writes the notes. Sign in to the `openai-codex` provider once. Claude Code (`claude`) also works, as the Choose a model section shows.
 
 To install the first four tools with Homebrew, run this command:
 
@@ -76,11 +76,25 @@ You can also use YT Notes without the browser. Each command saves its result in 
 | `python3 ytnotes.py "saas distribution" -t 60` | Writes notes for the best videos on a topic, about 60 minutes of video in total. |
 | `python3 ytnotes.py "https://youtu.be/VIDEO_ID" --audio --voice bm_george` | Writes notes and records the audio in the voice that you select. |
 | `python3 ytnotes.py --add-glossary` | Adds a glossary to old notes that do not have one. |
-| `python3 ytnotes.py --model claude-sonnet-5-5` | Uses a slower model that writes more detailed notes. The default is `claude-haiku-5-5`. |
+| `python3 ytnotes.py --model openai-codex/gpt-6-luna` | Uses a different model. See the Choose a model section. |
 | `python3 ytnotes.py --port 8766` | Starts the server on a different port. |
 | `python3 ytlearn.py "saas distribution" -t 60` | Makes a playlist link with short takeaways in the `playlists/` folder. |
 
 The voices are `af_heart` (the default), `af_bella`, `am_michael`, `am_fenrir`, `bf_emma`, and `bm_george`. The letters `a` and `b` mean American and British. The letters `f` and `m` mean female and male.
+
+## Choose a model
+
+The default model is `openai-codex/gpt-6-luna`, which runs through pi. Use `--model` to select a different model. The same model writes the notes, the glossaries, and the topic picks.
+
+| Value of `--model` | CLI that runs |
+|---|---|
+| `provider/model`, for example `openai-codex/gpt-6-luna` or `opencode-go/gpt-6-luna` | pi |
+| A Claude model, for example `claude-haiku-5-5` or `sonnet` | Claude Code |
+| `pi:` or `claude:` followed by a model name | The CLI that the prefix names |
+
+To see the models that pi can use, run `pi --list-models`. The model setting is part of the server command, for example `python3 ytnotes.py --model claude-haiku-5-5`.
+
+pi runs with its tools, sessions, extensions, and project files turned off. It gets only the prompt and the transcript.
 
 ## How it works
 
@@ -88,7 +102,7 @@ The app makes a note in four steps:
 
 1. yt-dlp gets the title, the channel, the length, and the English captions of the video.
 2. If YouTube blocks the caption download, youtube-transcript-api gets the captions in a different way.
-3. Claude Code writes the notes from the transcript. The prompt contains the note structure and the simple-english rules from `skills/simple-english/SKILL.md`.
+3. pi or Claude Code writes the notes from the transcript. The prompt contains the note structure and the simple-english rules from `skills/simple-english/SKILL.md`.
 4. For audio, `tts.py` changes the notes into a spoken script and Kokoro records it. ffmpeg then compresses the recording to an `.m4a` file.
 
 ## Files
@@ -101,6 +115,7 @@ The project has these files and folders:
 | `ytnotes.html` | The app that opens in the browser. |
 | `tts.py` | The script that records audio with Kokoro. |
 | `ytlearn.py` | The video search and the playlist builder. |
+| `llm.py` | The code that sends prompts to pi or Claude Code. |
 | `skills/simple-english/` | A copy of the simple-english skill, with its license and source. |
 | `assets/` | The app icon in SVG and PNG. |
 | `notes/` | Your notes, the audio files, and `index.json`. Git ignores this folder. |
@@ -112,13 +127,15 @@ These are the errors that you can see, and what to do:
 
 - "No English transcript available": The video has no English captions, or YouTube blocks both caption methods. Try again later or use a different video.
 - "Address already in use": Another copy of the server is running. Stop it with Ctrl+C, or start the server with `--port 8766`.
-- "529 Overloaded": The Claude API is busy. Try again after a few minutes.
+- "529 Overloaded" or a similar error from the model: The model provider is busy. Try again after a few minutes.
+- "Notes failed" with a sign-in message: Sign in to pi or Claude Code again, then try again.
 - The audio does not start: Make sure that you downloaded the Kokoro model. See the Requirements section.
 
 ## Credits
 
 YT Notes uses work from these projects:
 
+- [pi](https://github.com/earendil-works/pi) and [Claude Code](https://claude.com/claude-code), which run the models.
 - [simple-english](https://github.com/AminBlg/SimpleEnglish) by AminBlg, MIT license. A copy is in `skills/simple-english/`.
 - [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), the [mlx-community](https://huggingface.co/mlx-community/Kokoro-82M-bf16) conversion, and [mlx-audio](https://github.com/Blaizzy/mlx-audio).
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api).

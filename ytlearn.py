@@ -11,6 +11,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
 
+import llm
+
 UA = {"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US"}
 
 PROMPT = """You are summarizing a YouTube video for someone learning "{topic}" who is short on time.
@@ -115,9 +117,10 @@ def rank(topic, pool, budget_secs, per_channel, model):
     prompt = RANK_PROMPT.format(topic=topic, minutes=budget_secs // 60, budget=budget_secs,
                                 candidates=json.dumps(short, ensure_ascii=False))
     try:
-        out = subprocess.run(["claude", "-p", prompt, "--model", model],
-                             capture_output=True, text=True, timeout=300).stdout
-        ids = json.loads(re.search(r"\[.*\]", out, re.S).group(0))
+        res = llm.run(prompt, model, timeout=300)
+        if res.returncode != 0:
+            raise RuntimeError((res.stderr.strip() or "model failed").splitlines()[-1][:200])
+        ids = json.loads(re.search(r"\[.*\]", res.stdout, re.S).group(0))
     except Exception as e:
         print(f"  ranking failed ({e}), falling back to views", file=sys.stderr)
         return fill(pool, budget_secs, per_channel)
@@ -163,11 +166,10 @@ def summarize(v, topic, model, workdir):
         return "_No transcript available._"
     prompt = PROMPT.format(topic=topic, title=v["title"], channel=v["channel"])
     try:
-        out = subprocess.run(
-            ["claude", "-p", prompt, "--model", model],
-            input=text[:80000], capture_output=True, text=True, timeout=300,
-        )
-        return out.stdout.strip() or f"_Summary failed: {out.stderr.strip()[:200]}_"
+        out = llm.run(prompt, model, text[:80000], timeout=300)
+        if out.returncode != 0 or not out.stdout.strip():
+            return f"_Summary failed: {(out.stderr.strip() or 'no output').splitlines()[-1][:200]}_"
+        return out.stdout.strip()
     except Exception as e:
         return f"_Summary failed: {e}_"
 
@@ -204,7 +206,7 @@ def main():
     ap.add_argument("--per-channel", type=int, default=1)
     ap.add_argument("--no-summary", action="store_true")
     ap.add_argument("--no-rank", action="store_true", help="skip AI picking, rank by views only")
-    ap.add_argument("--model", default="claude-haiku-5-5")
+    ap.add_argument("--model", default=llm.DEFAULT_MODEL, help="pi provider/model, or a Claude model such as claude-haiku-5-5")
     ap.add_argument("-o", "--out", help="output markdown path")
     args = ap.parse_args()
 
