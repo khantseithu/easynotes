@@ -16,6 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
+import context
 import llm
 import ytlearn
 
@@ -23,6 +24,7 @@ ROOT = Path(__file__).resolve().parent
 NOTES = ROOT / "notes"
 INDEX = NOTES / "index.json"
 COLLECTIONS = NOTES / "collections.json"
+FRAMES = NOTES / "frames"
 MAX_PLAYLIST = 50
 SKIP_LISTS = ("RD", "WL", "LL", "UL")
 DEFAULT_MODEL = llm.DEFAULT_MODEL
@@ -35,7 +37,15 @@ VOICES = [
     ("bf_emma", "Emma · UK female"), ("bm_george", "George · UK male"),
 ]
 SECTION_INTROS = {"tl;dr": "In short.", "key ideas": "Key ideas.", "frameworks": "Frameworks.",
-                  "quotes": "A few memorable quotes.", "action items": "Action items.", "glossary": "Glossary."}
+                  "quotes": "A few memorable quotes.", "action items": "Action items.", "glossary": "Glossary.",
+                  "goal": "The goal.", "prerequisites": "What you need.", "steps": "The steps.",
+                  "gotchas": "Gotchas.", "result": "The result."}
+KINDS = ("conversation", "talk", "tutorial")
+GLOSSARY_SECTION = """## Glossary
+Every abbreviation and acronym used anywhere in the notes above (e.g. LTV, CAC, ARR, ICP, PLG), plus industry jargon
+a smart newcomer to the field would not know (e.g. churn, payback period). Skip everyday words, product names and analogies entirely: never list a skipped term or comment on what you skipped.
+Sort alphabetically, as "- **TERM** (full name, if it is an abbreviation): one plain-English sentence explaining it, in the context of this video."
+Omit this section only if the notes use no such terms."""
 
 NOTES_PROMPT = """Turn the YouTube transcript on stdin into notes good enough that the reader does not need to watch the video.
 
@@ -60,11 +70,7 @@ Only if the video teaches named models or step-by-step processes. Lay each out c
 ## Action items
 Concrete things to do, as "- [ ] ..." checkboxes.
 
-## Glossary
-Every abbreviation and acronym used anywhere in the notes above (e.g. LTV, CAC, ARR, ICP, PLG), plus industry jargon
-a smart newcomer to the field would not know (e.g. churn, payback period). Skip everyday words, product names and analogies entirely: never list a skipped term or comment on what you skipped.
-Sort alphabetically, as "- **TERM** (full name, if it is an abbreviation): one plain-English sentence explaining it, in the context of this video."
-Omit this section only if the notes use no such terms.
+""" + GLOSSARY_SECTION + """
 
 Length should match the substance: about 300 words for a 10-minute video, up to about 1500 for a long interview.
 Use only what is in the transcript, except glossary definitions, which may use general knowledge. Timestamps must come from the [mm:ss] markers in the transcript.
@@ -72,13 +78,54 @@ Output only the notes."""
 
 GLOSSARY_PROMPT = """The notes on stdin were written from a YouTube video. Write a glossary for them.
 
-## Glossary
-Every abbreviation and acronym used anywhere in the notes above (e.g. LTV, CAC, ARR, ICP, PLG), plus industry jargon
-a smart newcomer to the field would not know (e.g. churn, payback period). Skip everyday words, product names and analogies entirely: never list a skipped term or comment on what you skipped.
-Sort alphabetically, as "- **TERM** (full name, if it is an abbreviation): one plain-English sentence explaining it, in the context of this video."
-Omit this section only if the notes use no such terms.
+""" + GLOSSARY_SECTION + """
 
 Output only the "## Glossary" section, or nothing if there are no such terms."""
+
+TUTORIAL_PROMPT = """Turn the YouTube tutorial on stdin into notes that let the reader follow along and build the same thing
+without watching the whole video. They should only need to watch a short clip when a step is hard to follow.
+
+Video: "{title}" by {channel} ({duration}, published {published})
+
+Write markdown in exactly this structure:
+
+## Goal
+2-3 sentences: what the reader builds or learns, and the approach the video takes.
+
+## Prerequisites
+Bullets: the tools, languages, libraries, accounts and keys the tutorial needs, with versions when the video or the sources name them.
+
+## Steps
+Numbered steps in the order the video does them. Give each step a ### heading that starts with its number and ends with
+the timestamp where it starts, like "### 3. Add the database schema [12:34]".
+Under each heading, write what to do in short imperative sentences, one instruction per sentence, and state any condition before the instruction.
+Add the exact commands and code the step needs in fenced code blocks with a language tag.
+Show only the code the step adds or changes, not whole files, unless the file is short.
+Say which file each code block belongs to.
+
+## Gotchas
+Bullets: the errors, warnings and pitfalls that the presenter hits or mentions, each with its fix and timestamp. Omit this section if there are none.
+
+## Result
+What the reader has at the end, and the next steps or extensions that the video suggests.
+
+""" + GLOSSARY_SECTION + """
+
+Sources. Stdin can contain these blocks before the transcript:
+- "Chapters": the video's own chapters. Use them to shape the steps, but split or merge chapters when a step needs it.
+- "Linked sources": the repos, gists and docs pages linked in the video description.
+Take code, commands, file names and versions from the linked sources when they match what the video does, because the
+transcript cannot show what is on screen. If a step needs code that is in neither the transcript nor the sources,
+write your best reconstruction and add the line "_Reconstructed from the transcript. Check it against the video._" under the block.
+If the sources and the video disagree, follow the video and say what the source does differently.
+Timestamps must come from the [mm:ss] markers in the transcript. Glossary definitions may use general knowledge.
+Output only the notes."""
+
+KIND_PROMPT = """Classify the YouTube video described on stdin. Answer with one word:
+- tutorial: the viewer is shown how to build, code, configure or use something step by step (coding walkthroughs and hands-on product demos count).
+- talk: one speaker presents or lectures on a topic, with no hands-on steps to follow.
+- conversation: an interview, podcast, panel or discussion between people.
+Output only the word."""
 
 
 def simple_english_rules():
@@ -150,7 +197,7 @@ def fetch(vid, workdir, langs):
     subs = sorted(Path(workdir).glob(f"{vid}*.json3"))
     info = json.loads(info_file.read_text()) if info_file.exists() else video_info(vid)
     if not info:
-        return None, None
+        return None, None, None
     if subs:
         segments = []
         for e in json.loads(subs[0].read_text()).get("events", []):
@@ -158,13 +205,17 @@ def fetch(vid, workdir, langs):
     else:
         segments = api_transcript(vid)
     if not segments:
-        return None, None
+        return None, None, None
     meta = {
         "id": vid,
         "title": info.get("title", vid),
         "channel": info.get("channel") or info.get("uploader", ""),
         "secs": info.get("duration") or 0,
     }
+    date = info.get("upload_date") or ""
+    if re.fullmatch(r"\d{8}", date):
+        meta["published"] = f"{date[:4]}-{date[4:6]}-{date[6:]}"
+    extra = {"chapters": context.chapters(info), "description": info.get("description") or ""}
     lines, bucket, start = [], [], None
     for t, text in segments:
         text = text.strip()
@@ -178,11 +229,17 @@ def fetch(vid, workdir, langs):
             bucket, start = [], None
     if bucket:
         lines.append(f"[{stamp(start or 0)}] " + re.sub(r"\s+", " ", " ".join(bucket)))
-    return meta, "\n".join(lines)
+    return meta, "\n".join(lines), extra
+
+
+def outside_code(md, fn):
+    """Apply fn to the parts of md that are not fenced code blocks."""
+    parts = re.split(r"(^```.*?^```[^\n]*$)", md, flags=re.S | re.M)
+    return "".join(p if i % 2 else fn(p) for i, p in enumerate(parts))
 
 
 def clean_glossary(md):
-    return "\n".join(l for l in md.splitlines() if not re.search(r"\(\s*[^)]*\bomit", l, re.I))
+    return outside_code(md, lambda t: "\n".join(l for l in t.split("\n") if not re.search(r"\(\s*[^)]*\bomit", l, re.I)))
 
 
 def link_stamps(md, vid):
@@ -192,7 +249,7 @@ def link_stamps(md, vid):
         for p in parts:
             secs = secs * 60 + p
         return f"[{m.group(1)}](https://youtu.be/{vid}?t={secs})"
-    return re.sub(r"\[(\d{1,2}(?::\d{2}){1,2})\](?!\()", repl, md)
+    return outside_code(md, lambda t: re.sub(r"\[(\d{1,2}(?::\d{2}){1,2})\](?!\()", repl, t))
 
 
 def load_index():
@@ -212,29 +269,178 @@ def save_note(meta, body):
     return meta
 
 
-def make_notes(vid, model, log=print):
+def detect_kind(meta, extra, transcript, model):
+    about = "\n\n".join(part for part in [
+        f"Title: {meta['title']}\nChannel: {meta['channel']}\nLength: {ytlearn.fmt_duration(meta['secs'])}",
+        "Description:\n" + extra["description"][:3000],
+        "Chapters:\n" + "\n".join(t for _, t in extra["chapters"]) if extra["chapters"] else "",
+        "Start of the transcript:\n" + transcript[:4000],
+    ] if part)
+    out = llm.run(KIND_PROMPT, model, about, timeout=180)
+    words = re.findall(r"[a-z]+", out.stdout.lower()) if out.returncode == 0 else []
+    return next((w for w in reversed(words) if w in KINDS), "conversation")
+
+
+def to_secs(text):
+    secs = 0
+    for part in text.split(":"):
+        secs = secs * 60 + int(part)
+    return secs
+
+
+def download_video(vid, workdir):
+    out = subprocess.run(["yt-dlp", "-f", "bv*[height<=720][vcodec^=avc1]/bv*[height<=720]/b[height<=720]/b", "--quiet",
+                    "--no-warnings", "--no-playlist", "-o", str(Path(workdir) / "video.%(ext)s"),
+                    f"https://www.youtube.com/watch?v={vid}"], capture_output=True, text=True, timeout=1800)
+    video = next((f for f in Path(workdir).glob("video.*") if not f.name.endswith(".part")), None)
+    if video and video.stat().st_size:
+        return video, ""
+    errors = [l for l in out.stderr.splitlines() if "ERROR" in l]
+    return None, (errors or out.stderr.strip().splitlines() or ["no output"])[-1][:200]
+
+
+THUMB = (32, 18)
+
+
+def tiny_frame(video, t):
+    """A 32x18 grayscale copy of the frame at t seconds, as bytes, for comparing frames cheaply."""
+    out = subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1",
+                          "-vf", f"scale={THUMB[0]}:{THUMB[1]},format=gray", "-f", "rawvideo", "-"],
+                         capture_output=True, timeout=60)
+    return out.stdout if len(out.stdout) == THUMB[0] * THUMB[1] else None
+
+
+def frame_diff(a, b):
+    return sum(abs(x - y) for x, y in zip(a, b)) / len(a)
+
+
+def pick_frames(video, spans, per_step=6):
+    """Choose one moment in each (start, end) span that best shows what is on screen.
+
+    Tutorials cut back to the same shot again and again, usually the presenter talking to the camera.
+    So for each step, take a few candidate frames and keep the one that looks least like the candidates
+    of the other steps. Blank frames (fades, black screens) are skipped."""
+    cands = []
+    for i, (t0, t1) in enumerate(spans):
+        span = max(2, t1 - t0)
+        for k in range(per_step):
+            t = t0 + span * (0.1 + 0.8 * k / max(1, per_step - 1))
+            img = tiny_frame(video, t)
+            if img:
+                mean = sum(img) / len(img)
+                if (sum((x - mean) ** 2 for x in img) / len(img)) ** 0.5 >= 12:
+                    cands.append((i, t, img))
+    picks = {}
+    for i, t, img in cands:
+        others = sorted(frame_diff(img, o) for j, _, o in cands if j != i)
+        score = sum(others[:3]) / len(others[:3]) if others else 0
+        if score > picks.get(i, (-1, 0))[0]:
+            picks[i] = (score, t)
+    return [picks[i][1] if i in picks else t0 + min(5, (t1 - t0) / 4) for i, (t0, t1) in enumerate(spans)]
+
+
+def add_frames(vid, md, total, log=print):
+    """Put a frame from the video under each numbered step, linked to that moment in the video.
+    Returns the new markdown and an error message, which is empty when the frames worked."""
+    steps = list(re.finditer(r"^### (\d+)\..*\[(\d{1,2}(?::\d{2}){1,2})\]\s*$", md, re.M))
+    if not steps:
+        return md, ""
+    log(f"Downloading the video for screenshots ({len(steps)} steps)…")
+    out_dir = FRAMES / vid
+    starts = [to_secs(m.group(2)) for m in steps]
+    spans = [(t0, starts[i + 1] if i + 1 < len(starts) and starts[i + 1] > t0 else (total or t0 + 30))
+             for i, t0 in enumerate(starts)]
+    with tempfile.TemporaryDirectory() as workdir:
+        video, error = download_video(vid, workdir)
+        if not video:
+            log(f"No screenshots: the video download failed ({error})")
+            return md, f"The video download failed, so this note has no screenshots. yt-dlp said: {error}"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for old in out_dir.glob("*.jpg"):
+            old.unlink()
+        log("Choosing screenshots…")
+        times = pick_frames(video, spans)
+        for m, t in zip(steps, times):
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1",
+                            "-vf", "scale='min(1280,iw)':-2", "-q:v", "4", str(out_dir / f"{m.group(1)}.jpg")],
+                           capture_output=True, timeout=120)
+    parts, last = [], 0
+    for m, t in zip(steps, times):
+        if (out_dir / f"{m.group(1)}.jpg").exists():
+            parts += [md[last:m.end()], f"\n\n[![Step {m.group(1)} at {stamp(t)}](/frames/{vid}/{m.group(1)}.jpg)]"
+                                        f"(https://youtu.be/{vid}?t={int(t)})"]
+            last = m.end()
+    return "".join(parts) + md[last:], ""
+
+
+def links_section(urls):
+    items = []
+    for url in urls:
+        p = urllib.parse.urlparse(url)
+        host = (p.hostname or "").removeprefix("www.")
+        segs = [x for x in p.path.split("/") if x]
+        if host == "github.com" and len(segs) >= 2:
+            label = f"GitHub: {segs[0]}/{segs[1]}"
+        else:
+            label = host + ("/" + "/".join(segs) if segs else "")
+        items.append(f"- [{label}]({url})")
+    return "## Links\nFrom the video description.\n" + "\n".join(items) if items else ""
+
+
+def make_notes(vid, model, log=print, kind=None):
     existing = next((n for n in load_index() if n["id"] == vid), None)
     if existing and (NOTES / f"{vid}.md").exists():
         log(f"Already have notes for {existing['title']}")
         return existing
     with tempfile.TemporaryDirectory() as workdir:
-        meta, transcript = None, None
+        meta, transcript, extra = None, None, None
         for wait, langs in [(0, "en"), (5, "en.*"), (20, "en"), (45, "en.*")]:
             time.sleep(wait)
-            meta, transcript = fetch(vid, workdir, langs)
+            meta, transcript, extra = fetch(vid, workdir, langs)
             if transcript:
                 break
     if not transcript:
         raise RuntimeError(f"No English transcript available for {vid}")
-    log(f"Writing notes: {meta['title']}")
-    prompt = NOTES_PROMPT.format(title=meta["title"], channel=meta["channel"],
-                                 duration=ytlearn.fmt_duration(meta["secs"])) + WRITING_RULES
-    out = llm.run(prompt, model, transcript[:400000])
+    if kind not in KINDS:
+        log(f"Checking what kind of video this is: {meta['title']}")
+        kind = detect_kind(meta, extra, transcript, model)
+    meta["kind"] = kind
+    blocks = []
+    if extra["chapters"]:
+        blocks.append("## Chapters\n" + "\n".join(f"[{stamp(t)}] {title}" for t, title in extra["chapters"]))
+    fmt = {"title": meta["title"], "channel": meta["channel"], "duration": ytlearn.fmt_duration(meta["secs"])}
+    if kind == "tutorial":
+        found, used = context.gather(context.links(extra["description"]), log)
+        if found:
+            blocks.append("## Linked sources\n" + found)
+            meta["sources"] = used
+        prompt = TUTORIAL_PROMPT.format(**fmt, published=meta.get("published", "date unknown"))
+        heading = "## Goal"
+    else:
+        prompt = NOTES_PROMPT.format(**fmt)
+        if extra["chapters"]:
+            prompt += "\nThe video's own chapters come before the transcript on stdin. Use them to group the key ideas."
+        heading = "## TL;DR"
+    log(f"Writing {kind} notes: {meta['title']}")
+    stdin = "\n\n".join(blocks + ["## Transcript\n" + transcript]) if blocks else transcript
+    out = llm.run(prompt + WRITING_RULES, model, stdin[:400000])
     body = out.stdout.strip()
-    if out.returncode != 0 or not body.startswith("## TL;DR"):
+    if out.returncode != 0 or not body.startswith(heading):
         reason = (out.stderr.strip() or body).splitlines()[-1][:200] if (out.stderr.strip() or body) else "no output"
         raise RuntimeError(f"Notes failed for {meta['title']}: {reason}")
-    return save_note(meta, link_stamps(clean_glossary(body), vid))
+    body = clean_glossary(body)
+    if kind == "tutorial":
+        links = links_section(context.links(extra["description"]))
+        if links:
+            body = body.replace("\n## Glossary", f"\n{links}\n\n## Glossary", 1) if "\n## Glossary" in body \
+                else f"{body.rstrip()}\n\n{links}\n"
+        body, error = add_frames(vid, body, meta["secs"], log)
+        if error:
+            # Shown at the top of the note, so the reader knows why the screenshots are missing.
+            notice = f"> {error} Try `brew upgrade yt-dlp`, then make the note again.\n\n"
+            body = re.sub(r"^## Steps\n", lambda m: m.group(0) + notice, body, count=1, flags=re.M)
+        meta["frames"] = len(list((FRAMES / vid).glob("*.jpg"))) if (FRAMES / vid).exists() else 0
+    return save_note(meta, link_stamps(body, vid))
 
 
 def update_meta(vid, **fields):
@@ -248,7 +454,11 @@ def update_meta(vid, **fields):
 
 def speakable(meta, md):
     paras = [re.sub(r"\s*[|–—]\s*", ". ", meta["title"]) + f". By {meta['channel']}."]
+    md = re.sub(r"^```.*?^```[^\n]*$", "", md, flags=re.S | re.M)
+    md = re.sub(r"^## Links\n.*?(?=^## |\Z)", "", md, flags=re.S | re.M)
     for line in md.splitlines():
+        if line.startswith(("_Reconstructed from the transcript", "![", "[![", "> The video download failed")):
+            continue
         line = re.sub(r"\s*\[\d{1,2}(?::\d{2}){1,2}\]\([^)]*\)", "", line)
         line = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", line).strip()
         if not line:
@@ -361,7 +571,7 @@ def save_collection(c):
 
 
 def tldr(md):
-    m = re.search(r"^## TL;DR\s*\n(.+?)(?=^## |\Z)", md, re.S | re.M)
+    m = re.search(r"^## (?:TL;DR|Goal)\s*\n(.+?)(?=^## |\Z)", md, re.S | re.M)
     return re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", m.group(1)).strip() if m else ""
 
 
@@ -443,7 +653,7 @@ def topic_videos(topic, minutes, model):
     return ytlearn.rank(topic, pool, budget, 1, model) if pool else []
 
 
-def run_job(job, text, minutes, model):
+def run_job(job, text, minutes, model, kind=None):
     def log(msg):
         job["message"] = msg
 
@@ -476,7 +686,7 @@ def run_job(job, text, minutes, model):
 
         def one(v):
             try:
-                note = make_notes(v, model, log if len(vids) == 1 else (lambda m: None))
+                note = make_notes(v, model, log if len(vids) == 1 else (lambda m: None), kind)
                 done.append(note["id"])
             except Exception as e:
                 errors[v] = str(e)
@@ -544,6 +754,10 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             f = NOTES / f"{m.group(1)}.m4a"
             return self.send_file(f, "audio/mp4") if f.exists() else self.send(404, {"error": "not found"})
+        m = re.fullmatch(r"/frames/([\w-]{11})/(\d+)\.jpg", self.path)
+        if m:
+            f = FRAMES / m.group(1) / f"{m.group(2)}.jpg"
+            return self.send(200, f.read_bytes(), "image/jpeg") if f.exists() else self.send(404, {"error": "not found"})
         if self.path == "/manifest.webmanifest":
             return self.send(200, (ROOT / "manifest.webmanifest").read_bytes(), "application/manifest+json")
         if self.path == "/favicon.ico":
@@ -592,8 +806,8 @@ class Handler(BaseHTTPRequestHandler):
         job_id = uuid.uuid4().hex[:12]
         JOBS[job_id] = {"id": job_id, "status": "running", "message": "Starting…", "ids": [], "collections": [],
                         "title": None, "total": 0, "done": 0}
-        threading.Thread(target=run_job, args=(JOBS[job_id], text, int(body.get("minutes") or 60), self.model),
-                         daemon=True).start()
+        threading.Thread(target=run_job, args=(JOBS[job_id], text, int(body.get("minutes") or 60), self.model,
+                                               body.get("kind")), daemon=True).start()
         self.send(202, JOBS[job_id])
 
     def do_DELETE(self):
@@ -626,6 +840,8 @@ def main():
     ap.add_argument("--lan", action="store_true", help="also serve on your local network, e.g. for your phone")
     ap.add_argument("--audio", action="store_true", help="also record an audio version with Kokoro")
     ap.add_argument("--voice", default=VOICES[0][0], choices=[v for v, _ in VOICES])
+    ap.add_argument("--kind", choices=["auto", *KINDS], default="auto",
+                    help="note structure to use; auto detects it from the video (default)")
     ap.add_argument("--add-glossary", action="store_true", help="add a glossary to existing notes that lack one")
     args = ap.parse_args()
 
@@ -639,7 +855,7 @@ def main():
 
     if args.input:
         job = {"status": "running", "message": "", "ids": []}
-        run_job(job, "\n".join(args.input), args.time, args.model)
+        run_job(job, "\n".join(args.input), args.time, args.model, args.kind)
         if job["status"] == "error":
             sys.exit(job["message"])
         for vid in job["ids"]:
