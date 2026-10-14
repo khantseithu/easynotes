@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parent
 NOTES = ROOT / "notes"
 INDEX = NOTES / "index.json"
 COLLECTIONS = NOTES / "collections.json"
+FRAMES = NOTES / "frames"
 MAX_PLAYLIST = 50
 SKIP_LISTS = ("RD", "WL", "LL", "UL")
 DEFAULT_MODEL = llm.DEFAULT_MODEL
@@ -280,6 +281,68 @@ def detect_kind(meta, extra, transcript, model):
     return next((w for w in reversed(words) if w in KINDS), "conversation")
 
 
+def to_secs(text):
+    secs = 0
+    for part in text.split(":"):
+        secs = secs * 60 + int(part)
+    return secs
+
+
+def download_video(vid, workdir):
+    subprocess.run(["yt-dlp", "-f", "bv*[height<=720][vcodec^=avc1]/bv*[height<=720]/b[height<=720]/b", "--quiet",
+                    "--no-warnings", "--no-playlist", "-o", str(Path(workdir) / "video.%(ext)s"),
+                    f"https://www.youtube.com/watch?v={vid}"], capture_output=True, timeout=1800)
+    return next((f for f in Path(workdir).glob("video.*") if not f.name.endswith(".part")), None)
+
+
+def add_frames(vid, md, total, log=print):
+    """Put a frame from the video under each numbered step, linked to that moment in the video."""
+    steps = list(re.finditer(r"^### (\d+)\..*\[(\d{1,2}(?::\d{2}){1,2})\]\s*$", md, re.M))
+    if not steps:
+        return md
+    log(f"Downloading the video for screenshots ({len(steps)} steps)…")
+    out_dir = FRAMES / vid
+    with tempfile.TemporaryDirectory() as workdir:
+        video = download_video(vid, workdir)
+        if not video:
+            log("Could not download the video, so the note has no screenshots")
+            return md
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for old in out_dir.glob("*.jpg"):
+            old.unlink()
+        starts = [to_secs(m.group(2)) for m in steps]
+        for i, m in enumerate(steps):
+            t0 = starts[i]
+            t1 = starts[i + 1] if i + 1 < len(starts) and starts[i + 1] > t0 else (total or t0 + 30)
+            span = max(2, t1 - t0)
+            # Skip the first seconds, when the presenter is still introducing the step, and let ffmpeg pick
+            # the most representative frame of the next few seconds so fades and blur are avoided.
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", str(t0 + min(5, span / 4)), "-t",
+                            str(min(8, span / 2)), "-i", str(video), "-vf", "thumbnail=240,scale='min(1280,iw)':-2",
+                            "-frames:v", "1", "-q:v", "4", str(out_dir / f"{m.group(1)}.jpg")], capture_output=True, timeout=120)
+    parts, last = [], 0
+    for m, t0 in zip(steps, starts):
+        if (out_dir / f"{m.group(1)}.jpg").exists():
+            parts += [md[last:m.end()], f"\n\n[![Step {m.group(1)} at {m.group(2)}](/frames/{vid}/{m.group(1)}.jpg)]"
+                                        f"(https://youtu.be/{vid}?t={t0})"]
+            last = m.end()
+    return "".join(parts) + md[last:]
+
+
+def links_section(urls):
+    items = []
+    for url in urls:
+        p = urllib.parse.urlparse(url)
+        host = (p.hostname or "").removeprefix("www.")
+        segs = [x for x in p.path.split("/") if x]
+        if host == "github.com" and len(segs) >= 2:
+            label = f"GitHub: {segs[0]}/{segs[1]}"
+        else:
+            label = host + ("/" + "/".join(segs) if segs else "")
+        items.append(f"- [{label}]({url})")
+    return "## Links\nFrom the video description.\n" + "\n".join(items) if items else ""
+
+
 def make_notes(vid, model, log=print, kind=None):
     existing = next((n for n in load_index() if n["id"] == vid), None)
     if existing and (NOTES / f"{vid}.md").exists():
@@ -321,7 +384,15 @@ def make_notes(vid, model, log=print, kind=None):
     if out.returncode != 0 or not body.startswith(heading):
         reason = (out.stderr.strip() or body).splitlines()[-1][:200] if (out.stderr.strip() or body) else "no output"
         raise RuntimeError(f"Notes failed for {meta['title']}: {reason}")
-    return save_note(meta, link_stamps(clean_glossary(body), vid))
+    body = clean_glossary(body)
+    if kind == "tutorial":
+        links = links_section(context.links(extra["description"]))
+        if links:
+            body = body.replace("\n## Glossary", f"\n{links}\n\n## Glossary", 1) if "\n## Glossary" in body \
+                else f"{body.rstrip()}\n\n{links}\n"
+        body = add_frames(vid, body, meta["secs"], log)
+        meta["frames"] = len(list((FRAMES / vid).glob("*.jpg"))) if (FRAMES / vid).exists() else 0
+    return save_note(meta, link_stamps(body, vid))
 
 
 def update_meta(vid, **fields):
@@ -336,8 +407,9 @@ def update_meta(vid, **fields):
 def speakable(meta, md):
     paras = [re.sub(r"\s*[|–—]\s*", ". ", meta["title"]) + f". By {meta['channel']}."]
     md = re.sub(r"^```.*?^```[^\n]*$", "", md, flags=re.S | re.M)
+    md = re.sub(r"^## Links\n.*?(?=^## |\Z)", "", md, flags=re.S | re.M)
     for line in md.splitlines():
-        if line.startswith("_Reconstructed from the transcript"):
+        if line.startswith(("_Reconstructed from the transcript", "![", "[![")):
             continue
         line = re.sub(r"\s*\[\d{1,2}(?::\d{2}){1,2}\]\([^)]*\)", "", line)
         line = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", line).strip()
@@ -616,6 +688,10 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             f = NOTES / f"{m.group(1)}.m4a"
             return self.send_file(f, "audio/mp4") if f.exists() else self.send(404, {"error": "not found"})
+        m = re.fullmatch(r"/frames/([\w-]{11})/(\d+)\.jpg", self.path)
+        if m:
+            f = FRAMES / m.group(1) / f"{m.group(2)}.jpg"
+            return self.send(200, f.read_bytes(), "image/jpeg") if f.exists() else self.send(404, {"error": "not found"})
         if self.path == "/manifest.webmanifest":
             return self.send(200, (ROOT / "manifest.webmanifest").read_bytes(), "application/manifest+json")
         if self.path == "/favicon.ico":
