@@ -592,10 +592,17 @@ def collection_view(c):
 def collection_summary(c):
     notes = {n["id"]: n for n in load_index()}
     ready = [notes[v["id"]] for v in c["videos"] if v["id"] in notes]
+    videos = []
+    for v in c["videos"]:
+        item = {"id": v["id"], "title": v["title"]}
+        if v["id"] in notes:
+            item.update(channel=notes[v["id"]]["channel"], read_mins=notes[v["id"]]["read_mins"])
+        videos.append(item)
     return {k: c[k] for k in ("id", "kind", "title", "channel", "created")} | {
         "count": len(c["videos"]), "ready": len(ready),
         "secs": sum(v.get("secs") or 0 for v in c["videos"]),
         "read_mins": sum(n["read_mins"] for n in ready),
+        "videos": videos,
     }
 
 

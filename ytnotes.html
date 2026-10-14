@@ -117,6 +117,26 @@ svg { display: block; flex: none; }
 .filter input:focus { border-color: var(--accent); }
 .list { list-style: none; margin: 0; padding: 0 8px 16px; overflow-y: auto; flex: 1; overscroll-behavior: contain; }
 .item { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 10px 12px; border-radius: 10px; margin-bottom: 1px; }
+.folder-row { display: flex; align-items: stretch; }
+.sort-row { display: flex; align-items: stretch; }
+.sort-row > .item { flex: 1; min-width: 0; }
+.sort-handle { width: 28px; flex: none; border: 0; border-radius: 8px; padding: 0; background: transparent; color: var(--faint); cursor: grab; font-size: 16px; touch-action: none; }
+.sort-handle:hover { background: var(--hover); color: var(--text); }
+.sort-handle:active { cursor: grabbing; }
+.sort-handle[hidden] { display: none; }
+.pin-toggle { width: 30px; flex: none; border: 0; border-radius: 8px; padding: 0; background: transparent; color: var(--faint); }
+.pin-toggle:hover, .pin-toggle[aria-pressed="true"] { background: var(--hover); color: var(--accent); }
+.pin-toggle svg { margin: auto; }
+.sort-row.dragging { opacity: .45; }
+.sort-row.drop-before { box-shadow: inset 0 2px var(--accent); }
+.sort-row.drop-after { box-shadow: inset 0 -2px var(--accent); }
+.folder-row > .item { flex: 1; min-width: 0; }
+.folder-toggle { width: 34px; flex: none; border: 0; border-radius: 9px; background: none; color: var(--muted); }
+.folder-toggle:hover { background: var(--hover); color: var(--text); }
+.folder-toggle span { display: inline-block; transition: transform .15s; }
+.folder-toggle[aria-expanded="true"] span { transform: rotate(90deg); }
+.folder-children { list-style: none; margin: 0 0 4px 12px; padding: 0 0 0 8px; border-left: 1px solid var(--line); }
+.folder-children .item { padding: 8px 10px; }
 .item:hover { background: var(--hover); }
 .item[aria-current="true"] { background: var(--accent-soft); }
 .item .t { font-weight: 560; font-size: 14px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -413,6 +433,7 @@ function describeInput(s) {
   return [part(lists, "playlist"), part(vids, "video")].filter(Boolean).join(" and ");
 }
 const ICON = {
+  pin: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 5 5-4 1-4 4 1 5-2 2-3-6-5-5 2-2 5 1 4-4z"/><path d="m3 21 6-6"/></svg>`,
   play: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>`,
   pause: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`,
   headphones: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="5" height="7" rx="2"/><rect x="16" y="14" width="5" height="7" rx="2"/></svg>`,
@@ -425,7 +446,7 @@ const ICON = {
 const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
 const EXAMPLES = ["saas distribution", "founder-led sales", "pricing strategy", "product-led growth"];
 
-const state = { notes: [], collections: [], voices: [], current: null, note: null, jobs: [], minutes: store.get("minutes", 60), q: "", playing: null };
+const state = { notes: [], collections: [], voices: [], current: null, note: null, jobs: [], minutes: store.get("minutes", 60), q: "", playing: null, expandedFolders: store.get("expandedFolders", {}), folderOrder: store.get("folderOrder", []), noteOrder: store.get("noteOrder", []), pinnedItems: store.get("pinnedItems", []) };
 
 function applyTheme() {
   const t = store.get("theme", "system");
@@ -465,12 +486,21 @@ $("#in").addEventListener("keydown", e => {
 $("#q").addEventListener("input", e => { state.q = e.target.value.toLowerCase(); renderList(); });
 
 function renderList() {
+  const pinKey = (kind, id) => `${kind}:${id}`;
+  const isPinned = (kind, id) => state.pinnedItems.includes(pinKey(kind, id));
+  const ordered = (items, key, kind) => {
+    const order = state[key], rank = new Map(order.map((id, i) => [id, i]));
+    return [...items].sort((a, b) => Number(isPinned(kind, b.id)) - Number(isPinned(kind, a.id)) || (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+  };
   const match = x => !state.q || (x.title + " " + x.channel).toLowerCase().includes(state.q);
-  const notes = state.notes.filter(match);
-  const cols = state.collections.filter(match);
+  const notes = ordered(state.notes.filter(match), "noteOrder", "note");
+  const cols = ordered(state.collections, "folderOrder", "folder").map(c => {
+    const children = (c.videos || []).filter(v => v.read_mins && (!state.q || (v.title + " " + (v.channel || "")).toLowerCase().includes(state.q)));
+    return { ...c, children, matches: match(c) || children.length > 0 };
+  }).filter(c => c.matches);
   const saved = state.notes.reduce((a, n) => a + Math.max(0, n.secs - n.read_mins * 60), 0);
   $("#lib-stats").textContent = state.notes.length ? `${state.notes.length} notes${saved ? ` · ${dur(saved)} saved` : ""}` : "";
-  $("#filter").classList.toggle("on", state.notes.length > 5);
+  $("#filter").classList.toggle("on", state.notes.length > 5 || state.collections.length > 0);
   const jobs = state.jobs.map(j => `
     <li class="job ${j.status === "error" ? "err" : ""}">
       <div class="t">${esc(j.title || j.label)}</div>
@@ -478,14 +508,24 @@ function renderList() {
         ${j.status === "error" ? `<button class="x" data-dismiss="${j.id}">Dismiss</button>` : ""}</div>
       ${j.total > 1 && j.status !== "error" ? `<div class="bar"><i style="width:${Math.round(100 * (j.done || 0) / j.total)}%"></i></div>` : ""}
     </li>`).join("");
-  const colItems = cols.map(c => `
-    <li><button class="item" data-col="${esc(c.id)}" aria-current="${state.current === "c:" + c.id}">
-      <div class="t">${esc(c.title)}</div>
-      <div class="m"><span>${c.kind === "playlist" ? "Playlist" : "Topic"}</span><span class="dot">${c.ready < c.count ? `${c.ready} of ${c.count} notes` : `${c.count} videos`}</span>${
-        c.read_mins ? `<span class="dot">${c.read_mins} min read</span>` : ""}</div>
-    </button></li>`).join("");
+  const colItems = cols.map(c => {
+    const expanded = Object.hasOwn(state.expandedFolders, c.id) ? !!state.expandedFolders[c.id] : (!!state.q && !match(c));
+    return `<li>
+      <div class="folder-row sort-row" data-sortable="folder" data-sort-id="${esc(c.id)}">
+        <button class="sort-handle" data-drag-handle aria-label="Reorder ${esc(c.title)}. Use arrow keys to move" title="Drag or use ↑/↓ to reorder" draggable="true" ${state.q ? "hidden" : ""}>⠿</button>
+        <button class="pin-toggle" data-pin-kind="folder" data-pin-id="${esc(c.id)}" aria-label="${isPinned("folder", c.id) ? "Unpin" : "Pin"} ${esc(c.title)}" aria-pressed="${isPinned("folder", c.id)}" title="${isPinned("folder", c.id) ? "Unpin" : "Pin"}">${ICON.pin}</button>
+        <button class="item" data-col="${esc(c.id)}" aria-current="${state.current === "c:" + c.id}">
+          <div class="t">${esc(c.title)}</div>
+          <div class="m"><span>${c.kind === "playlist" ? "Playlist" : "Topic"}</span><span class="dot">${c.ready < c.count ? `${c.ready} of ${c.count} notes` : `${c.count} videos`}</span>${
+            c.read_mins ? `<span class="dot">${c.read_mins} min read</span>` : ""}</div>
+        </button>
+        <button class="folder-toggle" data-folder="${esc(c.id)}" aria-label="${expanded ? "Collapse" : "Expand"} ${esc(c.title)}" aria-expanded="${expanded}"><span>›</span></button>
+      </div>
+      ${expanded && c.children.length ? `<ul class="folder-children">${c.children.map(v => `<li><button class="item" data-id="${esc(v.id)}" aria-current="${v.id === state.current}"><div class="t">${esc(v.title)}</div><div class="m">${esc(v.channel || "")}<span class="dot">${v.read_mins} min read</span></div></button></li>`).join("")}</ul>` : ""}
+    </li>`;
+  }).join("");
   const items = notes.map(n => `
-    <li><button class="item" data-id="${n.id}" aria-current="${n.id === state.current}">
+    <li class="sort-row" data-sortable="note" data-sort-id="${esc(n.id)}"><button class="sort-handle" data-drag-handle aria-label="Reorder ${esc(n.title)}. Use arrow keys to move" title="Drag or use ↑/↓ to reorder" draggable="true" ${state.q ? "hidden" : ""}>⠿</button><button class="pin-toggle" data-pin-kind="note" data-pin-id="${esc(n.id)}" aria-label="${isPinned("note", n.id) ? "Unpin" : "Pin"} ${esc(n.title)}" aria-pressed="${isPinned("note", n.id)}" title="${isPinned("note", n.id) ? "Unpin" : "Pin"}">${ICON.pin}</button><button class="item" data-id="${esc(n.id)}" aria-current="${n.id === state.current}">
       <div class="t">${esc(n.title)}</div>
       <div class="m"><span>${esc(n.channel)}</span><span class="dot">${n.read_mins} min read</span>${
         state.playing === n.id ? `<span class="dot playing">Playing</span>` : n.audio ? `<span class="dot">Audio</span>` : ""}</div>
@@ -494,13 +534,88 @@ function renderList() {
   $("#list").innerHTML = jobs + (sections || (state.jobs.length ? "" : `<li class="empty-lib">${state.q ? "No notes match." : "Notes you make will appear here."}</li>`));
 }
 $("#list").onclick = e => {
+  const pin = e.target.closest("[data-pin-kind]");
+  if (pin) {
+    const key = `${pin.dataset.pinKind}:${pin.dataset.pinId}`;
+    state.pinnedItems = state.pinnedItems.includes(key) ? state.pinnedItems.filter(item => item !== key) : [...state.pinnedItems, key];
+    store.set("pinnedItems", state.pinnedItems);
+    renderList();
+    $(`[data-pin-kind="${pin.dataset.pinKind}"][data-pin-id="${CSS.escape(pin.dataset.pinId)}"]`).focus();
+    return;
+  }
   const d = e.target.closest("[data-dismiss]");
   if (d) { state.jobs = state.jobs.filter(j => j.id !== d.dataset.dismiss); return renderList(); }
   const c = e.target.closest("[data-col]");
   if (c) { openCollection(c.dataset.col); side(false); return; }
+  const f = e.target.closest("[data-folder]");
+  if (f) {
+    const id = f.dataset.folder;
+    state.expandedFolders[id] = f.getAttribute("aria-expanded") !== "true";
+    store.set("expandedFolders", state.expandedFolders);
+    renderList();
+    $(`#list [data-folder="${CSS.escape(id)}"]`).focus();
+    return;
+  }
   const b = e.target.closest(".item");
   if (b) { openNote(b.dataset.id); side(false); }
 };
+const clearDropMarks = () => document.querySelectorAll(".sort-row.drop-before, .sort-row.drop-after").forEach(row => row.classList.remove("drop-before", "drop-after"));
+const reorderRows = (kind, fromId, toId, after) => {
+  if (fromId === toId) return;
+  if (state.pinnedItems.includes(`${kind}:${fromId}`) !== state.pinnedItems.includes(`${kind}:${toId}`)) return;
+  const key = kind === "folder" ? "folderOrder" : "noteOrder";
+  const rows = [...document.querySelectorAll(`[data-sortable="${kind}"]`)];
+  const ids = rows.map(row => row.dataset.sortId);
+  const from = ids.indexOf(fromId), target = ids.indexOf(toId);
+  if (from < 0 || target < 0) return;
+  ids.splice(from, 1);
+  let at = ids.indexOf(toId) + (after ? 1 : 0);
+  ids.splice(at, 0, fromId);
+  state[key] = ids;
+  store.set(key, ids);
+  renderList();
+};
+$("#list").addEventListener("keydown", e => {
+  const handle = e.target.closest("[data-drag-handle]");
+  if (!handle || state.q || !["ArrowUp", "ArrowDown"].includes(e.key)) return;
+  e.preventDefault();
+  const row = handle.closest("[data-sortable]");
+  const pinned = state.pinnedItems.includes(`${row.dataset.sortable}:${row.dataset.sortId}`);
+  const group = [...document.querySelectorAll(`[data-sortable="${row.dataset.sortable}"]`)].filter(item => state.pinnedItems.includes(`${item.dataset.sortable}:${item.dataset.sortId}`) === pinned);
+  const index = group.indexOf(row), next = group[index + (e.key === "ArrowUp" ? -1 : 1)];
+  if (!next) return;
+  reorderRows(row.dataset.sortable, row.dataset.sortId, next.dataset.sortId, e.key === "ArrowDown");
+  $(`[data-sortable="${row.dataset.sortable}"][data-sort-id="${CSS.escape(row.dataset.sortId)}"] [data-drag-handle]`).focus();
+});
+$("#list").addEventListener("dragstart", e => {
+  const handle = e.target.closest("[data-drag-handle]");
+  const row = handle?.closest("[data-sortable]");
+  if (!row || state.q) return e.preventDefault();
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/plain", JSON.stringify({ kind: row.dataset.sortable, id: row.dataset.sortId }));
+  row.classList.add("dragging");
+});
+$("#list").addEventListener("dragover", e => {
+  const row = e.target.closest("[data-sortable]");
+  const dragged = document.querySelector(".sort-row.dragging");
+  if (!row || !dragged || row.dataset.sortable !== dragged.dataset.sortable || row === dragged) { clearDropMarks(); return; }
+  if (state.q) { clearDropMarks(); e.dataTransfer.dropEffect = "none"; return; }
+  if (state.pinnedItems.includes(`${row.dataset.sortable}:${row.dataset.sortId}`) !== state.pinnedItems.includes(`${dragged.dataset.sortable}:${dragged.dataset.sortId}`)) { clearDropMarks(); e.dataTransfer.dropEffect = "none"; return; }
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+  clearDropMarks();
+  row.classList.add(e.clientY < row.getBoundingClientRect().top + row.offsetHeight / 2 ? "drop-before" : "drop-after");
+});
+$("#list").addEventListener("drop", e => {
+  const row = e.target.closest("[data-sortable]");
+  const dragged = document.querySelector(".sort-row.dragging");
+  if (state.q || !row || !dragged || row.dataset.sortable !== dragged.dataset.sortable || row === dragged) return;
+  if (state.pinnedItems.includes(`${row.dataset.sortable}:${row.dataset.sortId}`) !== state.pinnedItems.includes(`${dragged.dataset.sortable}:${dragged.dataset.sortId}`)) return;
+  e.preventDefault();
+  const after = e.clientY >= row.getBoundingClientRect().top + row.offsetHeight / 2;
+  reorderRows(row.dataset.sortable, dragged.dataset.sortId, row.dataset.sortId, after);
+});
+$("#list").addEventListener("dragend", () => { clearDropMarks(); document.querySelectorAll(".sort-row.dragging").forEach(row => row.classList.remove("dragging")); });
 
 async function loadNotes() { state.notes = await api("/api/notes"); renderList(); }
 async function loadCollections() { state.collections = await api("/api/collections"); renderList(); }
