@@ -167,7 +167,7 @@ async function noteView(id) {
     <div class="kicker"><span>${esc(n.channel)}</span><span>${dur(n.secs)} video</span><span>${n.read_mins} min read</span>${saved ? `<span class="saved">${dur(saved)} saved</span>` : ""}</div>
     <h1>${esc(n.title)}</h1>
     <div class="actions" id="actions"></div>
-    <div class="md" id="md">${DOMPurify.sanitize(marked.parse(n.markdown))}</div>`;
+    <div class="md" id="md">${DOMPurify.sanitize(marked.parse(n.markdown).replaceAll('src="/frames/', `src="${state.server}/frames/`))}</div>`;
   enhance($("#md"), n, new Set(await local.get(`done:${n.id}`, [])));
   renderActions();
   scrollTo({ top: 0 });

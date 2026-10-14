@@ -17,9 +17,10 @@ Tutorials get a different structure, so that you can follow along without watchi
 
 - The goal: what you build or learn.
 - The prerequisites: tools, versions and accounts.
-- Numbered steps, each with a link to its timestamp and the commands or code that it needs.
+- Numbered steps, each with a link to its timestamp, a screenshot from the video, and the commands or code that it needs. Select a screenshot to watch that part of the video.
 - Gotchas: the errors and fixes that the presenter mentions.
 - The result, and what to try next.
+- The links from the video description.
 - A glossary.
 
 The app decides the kind of video by itself. To choose the structure yourself, use `--kind tutorial` or `--kind conversation`.
@@ -131,7 +132,8 @@ The app makes a note in these steps:
 3. The model reads the title, the description, and the start of the transcript, and decides if the video is a conversation, a talk, or a tutorial.
 4. For a tutorial, `context.py` reads the GitHub repos, gists, and docs pages that the description links to. From a repo, it reads the README, the file list, and a few key files. The model then uses the real code instead of guessing it from speech.
 5. pi or Claude Code writes the notes from the chapters, the linked sources, and the transcript. The prompt contains the note structure and the simple-english rules from `skills/simple-english/SKILL.md`.
-6. For audio, `tts.py` changes the notes into a spoken script and Kokoro records it. ffmpeg then compresses the recording to an `.m4a` file.
+6. For a tutorial, yt-dlp downloads the video at 720p or lower, and ffmpeg takes one frame for each step. The frames are in `notes/frames/`.
+7. For audio, `tts.py` changes the notes into a spoken script and Kokoro records it. ffmpeg then compresses the recording to an `.m4a` file.
 
 ## Files
 
