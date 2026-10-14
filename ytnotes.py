@@ -420,6 +420,16 @@ class Handler(BaseHTTPRequestHandler):
         self.send(202, JOBS[job_id])
 
 
+def lan_ip():
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        try:
+            sock.connect(("10.255.255.255", 1))
+            return sock.getsockname()[0]
+        except OSError:
+            return "127.0.0.1"
+
+
 def main():
     ap = argparse.ArgumentParser(description="Read YouTube videos instead of watching them.")
     ap.add_argument("input", nargs="?", help="YouTube URL or topic; omit to open the app")
@@ -427,6 +437,7 @@ def main():
     ap.add_argument("--model", default="sonnet")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true", help="don't open the browser")
+    ap.add_argument("--lan", action="store_true", help="also serve on your local network, e.g. for your phone")
     ap.add_argument("--audio", action="store_true", help="also record an audio version with Kokoro")
     ap.add_argument("--voice", default=VOICES[0][0], choices=[v for v, _ in VOICES])
     ap.add_argument("--add-glossary", action="store_true", help="add a glossary to existing notes that lack one")
@@ -455,9 +466,11 @@ def main():
         return
 
     Handler.model = args.model
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    server = ThreadingHTTPServer(("0.0.0.0" if args.lan else "127.0.0.1", args.port), Handler)
     url = f"http://127.0.0.1:{args.port}"
     print(f"YT Notes running at {url}  (Ctrl+C to stop)")
+    if args.lan:
+        print(f"On your phone (same Wi-Fi): http://{lan_ip()}:{args.port}")
     if not args.no_open:
         webbrowser.open(url)
     try:
