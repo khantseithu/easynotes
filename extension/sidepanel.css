@@ -67,6 +67,10 @@ h1 { font-size: 21px; line-height: 1.22; letter-spacing: -0.018em; margin: 0 0 1
 .btn.primary:hover { filter: brightness(1.06); }
 .btn[disabled] { cursor: default; }
 .btn.wide { width: 100%; height: 42px; }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: var(--accent-ink); }
+.btn.danger:hover { filter: brightness(1.06); }
+.actions .del { margin-left: auto; color: var(--muted); }
+.actions .del:hover { color: var(--danger); border-color: var(--danger); }
 .btn .fill { position: absolute; inset: 0 auto 0 0; background: oklch(1 0 0 / 0.18); width: 0; transition: width .4s var(--ease); }
 .btn > span, .btn > svg { position: relative; }
 .voice { height: 36px; padding: 0 28px 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--raised); font-size: 13px; color: var(--muted); min-width: 0; flex: 1;
