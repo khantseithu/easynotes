@@ -289,24 +289,29 @@ def to_secs(text):
 
 
 def download_video(vid, workdir):
-    subprocess.run(["yt-dlp", "-f", "bv*[height<=720][vcodec^=avc1]/bv*[height<=720]/b[height<=720]/b", "--quiet",
+    out = subprocess.run(["yt-dlp", "-f", "bv*[height<=720][vcodec^=avc1]/bv*[height<=720]/b[height<=720]/b", "--quiet",
                     "--no-warnings", "--no-playlist", "-o", str(Path(workdir) / "video.%(ext)s"),
-                    f"https://www.youtube.com/watch?v={vid}"], capture_output=True, timeout=1800)
-    return next((f for f in Path(workdir).glob("video.*") if not f.name.endswith(".part")), None)
+                    f"https://www.youtube.com/watch?v={vid}"], capture_output=True, text=True, timeout=1800)
+    video = next((f for f in Path(workdir).glob("video.*") if not f.name.endswith(".part")), None)
+    if video and video.stat().st_size:
+        return video, ""
+    errors = [l for l in out.stderr.splitlines() if "ERROR" in l]
+    return None, (errors or out.stderr.strip().splitlines() or ["no output"])[-1][:200]
 
 
 def add_frames(vid, md, total, log=print):
-    """Put a frame from the video under each numbered step, linked to that moment in the video."""
+    """Put a frame from the video under each numbered step, linked to that moment in the video.
+    Returns the new markdown and an error message, which is empty when the frames worked."""
     steps = list(re.finditer(r"^### (\d+)\..*\[(\d{1,2}(?::\d{2}){1,2})\]\s*$", md, re.M))
     if not steps:
-        return md
+        return md, ""
     log(f"Downloading the video for screenshots ({len(steps)} steps)…")
     out_dir = FRAMES / vid
     with tempfile.TemporaryDirectory() as workdir:
-        video = download_video(vid, workdir)
+        video, error = download_video(vid, workdir)
         if not video:
-            log("Could not download the video, so the note has no screenshots")
-            return md
+            log(f"No screenshots: the video download failed ({error})")
+            return md, f"The video download failed, so this note has no screenshots. yt-dlp said: {error}"
         out_dir.mkdir(parents=True, exist_ok=True)
         for old in out_dir.glob("*.jpg"):
             old.unlink()
@@ -326,7 +331,7 @@ def add_frames(vid, md, total, log=print):
             parts += [md[last:m.end()], f"\n\n[![Step {m.group(1)} at {m.group(2)}](/frames/{vid}/{m.group(1)}.jpg)]"
                                         f"(https://youtu.be/{vid}?t={t0})"]
             last = m.end()
-    return "".join(parts) + md[last:]
+    return "".join(parts) + md[last:], ""
 
 
 def links_section(urls):
@@ -390,7 +395,11 @@ def make_notes(vid, model, log=print, kind=None):
         if links:
             body = body.replace("\n## Glossary", f"\n{links}\n\n## Glossary", 1) if "\n## Glossary" in body \
                 else f"{body.rstrip()}\n\n{links}\n"
-        body = add_frames(vid, body, meta["secs"], log)
+        body, error = add_frames(vid, body, meta["secs"], log)
+        if error:
+            # Shown at the top of the note, so the reader knows why the screenshots are missing.
+            notice = f"> {error} Try `brew upgrade yt-dlp`, then make the note again.\n\n"
+            body = re.sub(r"^## Steps\n", lambda m: m.group(0) + notice, body, count=1, flags=re.M)
         meta["frames"] = len(list((FRAMES / vid).glob("*.jpg"))) if (FRAMES / vid).exists() else 0
     return save_note(meta, link_stamps(body, vid))
 
@@ -409,7 +418,7 @@ def speakable(meta, md):
     md = re.sub(r"^```.*?^```[^\n]*$", "", md, flags=re.S | re.M)
     md = re.sub(r"^## Links\n.*?(?=^## |\Z)", "", md, flags=re.S | re.M)
     for line in md.splitlines():
-        if line.startswith(("_Reconstructed from the transcript", "![", "[![")):
+        if line.startswith(("_Reconstructed from the transcript", "![", "[![", "> The video download failed")):
             continue
         line = re.sub(r"\s*\[\d{1,2}(?::\d{2}){1,2}\]\([^)]*\)", "", line)
         line = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", line).strip()
