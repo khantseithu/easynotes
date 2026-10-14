@@ -15,6 +15,7 @@ const ICON = {
   pause: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`,
   headphones: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="5" height="7" rx="2"/><rect x="16" y="14" width="5" height="7" rx="2"/></svg>`,
   notes: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h5"/></svg>`,
+  trash: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>`,
   watch: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 5v14l12-7z"/></svg>`,
 };
 const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
@@ -23,7 +24,7 @@ const state = {
   server: "", windowId: null, tab: null, tabVid: null,
   route: { kind: "tab" }, // "tab" follows the YouTube tab; "library" and "note" are picked by the user
   notes: null, voices: [], note: null, terms: {}, jobs: {},
-  minutes: 60, q: "", playing: null, offline: null,
+  minutes: 60, q: "", playing: null, offline: null, confirmDelete: null,
 };
 
 // ---------- data ----------
@@ -162,6 +163,7 @@ async function noteView(id) {
   try { n = await api(`/api/notes/${id}`); } catch (e) { shown = null; state.offline = e.message; return render(); }
   if (shown !== id) return;
   state.note = n;
+  state.confirmDelete = null;
   const saved = Math.max(0, n.secs - n.read_mins * 60);
   $("#view").innerHTML = `
     <div class="kicker"><span>${esc(n.channel)}</span><span>${dur(n.secs)} video</span><span>${n.read_mins} min read</span>${saved ? `<span class="saved">${dur(saved)} saved</span>` : ""}</div>
@@ -319,6 +321,7 @@ function voiceOf() { return state.voices.some(x => x.id === voicePref) ? voicePr
 function renderActions(msg, kind, pct) {
   const n = state.note;
   if (!n || !$("#actions")) return;
+  if (state.confirmDelete === n.id) return renderConfirm(n);
   const voice = voiceOf();
   const ready = n.audio && n.audio.voice === voice;
   const isPlaying = state.playing?.id === n.id && !audio.paused;
@@ -331,13 +334,43 @@ function renderActions(msg, kind, pct) {
     ${state.voices.length ? `<label class="vh" for="voice">Voice</label>
     <select class="voice" id="voice">${state.voices.map(v => `<option value="${v.id}" ${v.id === voice ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select>` : ""}
     ${state.tabVid === n.id ? "" : `<button class="btn" id="watch">${ICON.watch}<span>Watch</span></button>`}
+    <button class="btn del" id="del" aria-label="Delete notes" title="Delete notes" ${busy ? "disabled" : ""}>${ICON.trash}</button>
     ${kind === "err" ? `<p class="msg err" style="flex-basis:100%;margin:0">${esc(msg)}</p>` : ""}`;
+  $("#del").onclick = () => { state.confirmDelete = n.id; renderActions(); $("#del-yes").focus(); };
   $("#voice")?.addEventListener("change", e => { voicePref = e.target.value; local.set("voice", voicePref); renderActions(); });
   $("#watch")?.addEventListener("click", () => watch(n.id));
   $("#listen").onclick = () => {
     if (ready) return state.playing?.id === n.id ? togglePlay() : play(n);
     record(n);
   };
+}
+
+function renderConfirm(n, err) {
+  $("#actions").innerHTML = `
+    <p class="msg ${err ? "err" : ""}" style="flex-basis:100%;margin:0">${esc(err || `Delete these notes${n.audio ? " and their audio" : ""}? You can't undo this.`)}</p>
+    <button class="btn danger" id="del-yes">${ICON.trash}<span>Delete</span></button>
+    <button class="btn" id="del-no">Cancel</button>`;
+  $("#del-no").onclick = () => { state.confirmDelete = null; renderActions(); };
+  $("#del-yes").onclick = () => deleteNote(n);
+}
+
+async function deleteNote(n) {
+  $("#del-yes").disabled = $("#del-no").disabled = true;
+  try {
+    await api(`/api/notes/${n.id}`, { method: "DELETE" });
+  } catch (e) {
+    return renderConfirm(n, e.message);
+  }
+  state.confirmDelete = null;
+  if (state.playing?.id === n.id) $("#p-close").click();
+  chrome.storage.local.remove([`pos:${n.id}`, `done:${n.id}`]);
+  chrome.runtime.sendMessage({ type: "notes-changed" }).catch(() => {});
+  shown = null;
+  state.note = null;
+  await loadIndex();
+  if (state.route.kind === "note") state.route = { kind: "library" };
+  render();
+  scrollTo({ top: 0 });
 }
 
 async function record(n) {
