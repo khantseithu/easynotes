@@ -300,6 +300,24 @@ def make_audio(vid, voice, log=print):
     return next(n for n in load_index() if n["id"] == vid)
 
 
+def delete_note(vid):
+    with LOCK:
+        index = load_index()
+        found = any(n["id"] == vid for n in index) or (NOTES / f"{vid}.md").exists()
+        if not found:
+            return False
+        INDEX.write_text(json.dumps([n for n in index if n["id"] != vid], indent=2, ensure_ascii=False))
+        cols = load_collections()
+        for c in cols:
+            if any(v["id"] == vid for v in c["videos"]):
+                c.setdefault("skipped", {})[vid] = "Notes deleted"
+        if cols:
+            COLLECTIONS.write_text(json.dumps(cols, indent=2, ensure_ascii=False))
+    for ext in ("md", "m4a"):
+        (NOTES / f"{vid}.{ext}").unlink(missing_ok=True)
+    return True
+
+
 def run_audio_job(job, vid, voice):
     try:
         make_audio(vid, voice, lambda m: job.update(message=m))
@@ -577,6 +595,14 @@ class Handler(BaseHTTPRequestHandler):
         threading.Thread(target=run_job, args=(JOBS[job_id], text, int(body.get("minutes") or 60), self.model),
                          daemon=True).start()
         self.send(202, JOBS[job_id])
+
+    def do_DELETE(self):
+        m = re.fullmatch(r"/api/notes/([\w-]{11})", urlparse(self.path).path)
+        if not m:
+            return self.send(404, {"error": "not found"})
+        if not delete_note(m.group(1)):
+            return self.send(404, {"error": "Note not found"})
+        self.send(200, {"id": m.group(1), "deleted": True})
 
 
 def lan_ip():
