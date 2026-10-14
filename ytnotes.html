@@ -116,32 +116,44 @@ svg { display: block; flex: none; }
 .filter input { width: 100%; padding: 7px 10px; border-radius: 9px; border: 1px solid var(--line); background: transparent; font-size: 13.5px; outline: none; }
 .filter input:focus { border-color: var(--accent); }
 .list { list-style: none; margin: 0; padding: 0 8px 16px; overflow-y: auto; flex: 1; overscroll-behavior: contain; }
-.item { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 10px 12px; border-radius: 10px; margin-bottom: 1px; }
-.folder-row { display: flex; align-items: stretch; }
+.item { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 8px; border-radius: 10px; margin-bottom: 1px; }
+.folder-row { position: relative; display: flex; align-items: stretch; padding-left: 28px; }
 .sort-row { display: flex; align-items: stretch; }
-.sort-row > .item { flex: 1; min-width: 0; }
-.sort-handle { width: 28px; flex: none; border: 0; border-radius: 8px; padding: 0; background: transparent; color: var(--faint); cursor: grab; font-size: 16px; touch-action: none; }
+.sort-row > .item { width: auto; flex: 1; min-width: 0; }
+.sort-handle { width: 22px; flex: none; border: 0; border-radius: 8px; padding: 0; background: transparent; color: var(--faint); cursor: grab; font-size: 16px; touch-action: none; }
 .sort-handle:hover { background: var(--hover); color: var(--text); }
 .sort-handle:active { cursor: grabbing; }
 .sort-handle[hidden] { display: none; }
-.pin-toggle { width: 30px; flex: none; border: 0; border-radius: 8px; padding: 0; background: transparent; color: var(--faint); }
-.pin-toggle:hover, .pin-toggle[aria-pressed="true"] { background: var(--hover); color: var(--accent); }
-.pin-toggle svg { margin: auto; }
 .sort-row.dragging { opacity: .45; }
 .sort-row.drop-before { box-shadow: inset 0 2px var(--accent); }
 .sort-row.drop-after { box-shadow: inset 0 -2px var(--accent); }
-.folder-row > .item { flex: 1; min-width: 0; }
-.folder-toggle { width: 34px; flex: none; border: 0; border-radius: 9px; background: none; color: var(--muted); }
+.folder-row > .item { width: auto; flex: 1; min-width: 0; padding-right: 8px; }
+.folder-toggle { position: absolute; top: 4px; left: 0; width: 28px; height: 28px; border: 0; border-radius: 9px; background: none; color: var(--muted); }
 .folder-toggle:hover { background: var(--hover); color: var(--text); }
 .folder-toggle span { display: inline-block; transition: transform .15s; }
 .folder-toggle[aria-expanded="true"] span { transform: rotate(90deg); }
+.folder-actions { position: absolute; right: 4px; bottom: 3px; display: flex; align-items: center; }
+.folder-actions .sort-handle { width: 24px; height: 26px; }
+.folder-actions .sort-handle { font-size: 14px; }
+.folder-meta { padding-right: 32px; gap: 0 8px; }
+@media (hover: hover) and (pointer: fine) {
+  .folder-actions { opacity: 0; pointer-events: none; }
+  .folder-row:hover .folder-actions, .folder-row:focus-within .folder-actions { opacity: 1; pointer-events: auto; }
+}
+@media (hover: none), (pointer: coarse) {
+  .folder-toggle { height: 44px; }
+  .folder-actions .sort-handle { width: 44px; height: 44px; }
+  .folder-actions { bottom: 8px; }
+  .folder-meta { min-height: 44px; align-items: center; padding-right: 52px; }
+}
 .folder-children { list-style: none; margin: 0 0 4px 12px; padding: 0 0 0 8px; border-left: 1px solid var(--line); }
 .folder-children .item { padding: 8px 10px; }
 .item:hover { background: var(--hover); }
 .item[aria-current="true"] { background: var(--accent-soft); }
 .item .t { font-weight: 560; font-size: 14px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.item .m { display: flex; flex-wrap: wrap; gap: 0 6px; color: var(--muted); font-size: 12px; margin-top: 3px; }
-.item .m .dot::before { content: "·"; margin-right: 6px; color: var(--faint); }
+.item .m { display: flex; flex-wrap: wrap; gap: 0 8px; color: var(--muted); font-size: 12px; margin-top: 3px; }
+.item .m > span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item .m .dot::before { content: "·"; margin-right: 8px; color: var(--faint); }
 .item .playing { color: var(--accent); font-weight: 600; }
 .job { padding: 10px 12px; border-radius: 10px; background: var(--raised); border: 1px dashed var(--line); margin-bottom: 6px; }
 .job .t { font-size: 13.5px; font-weight: 560; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -493,7 +505,8 @@ function renderList() {
     return [...items].sort((a, b) => Number(isPinned(kind, b.id)) - Number(isPinned(kind, a.id)) || (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER));
   };
   const match = x => !state.q || (x.title + " " + x.channel).toLowerCase().includes(state.q);
-  const notes = ordered(state.notes.filter(match), "noteOrder", "note");
+  const playlistNoteIds = new Set(state.collections.filter(c => c.kind === "playlist").flatMap(c => (c.videos || []).map(v => v.id)));
+  const notes = ordered(state.notes.filter(n => !playlistNoteIds.has(n.id) && match(n)), "noteOrder", "note");
   const cols = ordered(state.collections, "folderOrder", "folder").map(c => {
     const children = (c.videos || []).filter(v => v.read_mins && (!state.q || (v.title + " " + (v.channel || "")).toLowerCase().includes(state.q)));
     return { ...c, children, matches: match(c) || children.length > 0 };
@@ -512,20 +525,21 @@ function renderList() {
     const expanded = Object.hasOwn(state.expandedFolders, c.id) ? !!state.expandedFolders[c.id] : (!!state.q && !match(c));
     return `<li>
       <div class="folder-row sort-row" data-sortable="folder" data-sort-id="${esc(c.id)}">
-        <button class="sort-handle" data-drag-handle aria-label="Reorder ${esc(c.title)}. Use arrow keys to move" title="Drag or use ↑/↓ to reorder" draggable="true" ${state.q ? "hidden" : ""}>⠿</button>
-        <button class="pin-toggle" data-pin-kind="folder" data-pin-id="${esc(c.id)}" aria-label="${isPinned("folder", c.id) ? "Unpin" : "Pin"} ${esc(c.title)}" aria-pressed="${isPinned("folder", c.id)}" title="${isPinned("folder", c.id) ? "Unpin" : "Pin"}">${ICON.pin}</button>
+        <button class="folder-toggle" data-folder="${esc(c.id)}" aria-label="${expanded ? "Collapse" : "Expand"} ${esc(c.title)}" aria-expanded="${expanded}"><span>›</span></button>
         <button class="item" data-col="${esc(c.id)}" aria-current="${state.current === "c:" + c.id}">
           <div class="t">${esc(c.title)}</div>
-          <div class="m"><span>${c.kind === "playlist" ? "Playlist" : "Topic"}</span><span class="dot">${c.ready < c.count ? `${c.ready} of ${c.count} notes` : `${c.count} videos`}</span>${
-            c.read_mins ? `<span class="dot">${c.read_mins} min read</span>` : ""}</div>
+          <div class="m folder-meta"><span>${c.ready < c.count ? `${c.ready} of ${c.count} notes` : `${c.count} videos`}</span>${
+            c.read_mins ? `<span>${c.read_mins} min read</span>` : ""}</div>
         </button>
-        <button class="folder-toggle" data-folder="${esc(c.id)}" aria-label="${expanded ? "Collapse" : "Expand"} ${esc(c.title)}" aria-expanded="${expanded}"><span>›</span></button>
+        <div class="folder-actions">
+          <button class="sort-handle" data-drag-handle aria-label="Reorder ${esc(c.title)}. Use arrow keys to move" title="Drag or use ↑/↓ to reorder" draggable="true" ${state.q ? "hidden" : ""}>⠿</button>
+        </div>
       </div>
       ${expanded && c.children.length ? `<ul class="folder-children">${c.children.map(v => `<li><button class="item" data-id="${esc(v.id)}" aria-current="${v.id === state.current}"><div class="t">${esc(v.title)}</div><div class="m">${esc(v.channel || "")}<span class="dot">${v.read_mins} min read</span></div></button></li>`).join("")}</ul>` : ""}
     </li>`;
   }).join("");
   const items = notes.map(n => `
-    <li class="sort-row" data-sortable="note" data-sort-id="${esc(n.id)}"><button class="sort-handle" data-drag-handle aria-label="Reorder ${esc(n.title)}. Use arrow keys to move" title="Drag or use ↑/↓ to reorder" draggable="true" ${state.q ? "hidden" : ""}>⠿</button><button class="pin-toggle" data-pin-kind="note" data-pin-id="${esc(n.id)}" aria-label="${isPinned("note", n.id) ? "Unpin" : "Pin"} ${esc(n.title)}" aria-pressed="${isPinned("note", n.id)}" title="${isPinned("note", n.id) ? "Unpin" : "Pin"}">${ICON.pin}</button><button class="item" data-id="${esc(n.id)}" aria-current="${n.id === state.current}">
+    <li class="sort-row" data-sortable="note" data-sort-id="${esc(n.id)}"><button class="sort-handle" data-drag-handle aria-label="Reorder ${esc(n.title)}. Use arrow keys to move" title="Drag or use ↑/↓ to reorder" draggable="true" ${state.q ? "hidden" : ""}>⠿</button><button class="item" data-id="${esc(n.id)}" aria-current="${n.id === state.current}">
       <div class="t">${esc(n.title)}</div>
       <div class="m"><span>${esc(n.channel)}</span><span class="dot">${n.read_mins} min read</span>${
         state.playing === n.id ? `<span class="dot playing">Playing</span>` : n.audio ? `<span class="dot">Audio</span>` : ""}</div>
@@ -533,16 +547,18 @@ function renderList() {
   const sections = colItems ? `<li class="lib-label">Playlists and topics</li>${colItems}${items ? `<li class="lib-label">Notes</li>${items}` : ""}` : items;
   $("#list").innerHTML = jobs + (sections || (state.jobs.length ? "" : `<li class="empty-lib">${state.q ? "No notes match." : "Notes you make will appear here."}</li>`));
 }
+function togglePin(kind, id) {
+  const key = `${kind}:${id}`;
+  state.pinnedItems = state.pinnedItems.includes(key) ? state.pinnedItems.filter(item => item !== key) : [...state.pinnedItems, key];
+  store.set("pinnedItems", state.pinnedItems);
+  renderList();
+}
+function pinButton(kind, id, title) {
+  const pinned = state.pinnedItems.includes(`${kind}:${id}`);
+  const action = pinned ? "Unpin" : "Pin";
+  return `<button class="btn" data-pin-kind="${kind}" data-pin-id="${esc(id)}" data-pin-title="${esc(title)}" aria-label="${action} ${esc(title)}" aria-pressed="${pinned}">${ICON.pin}<span>${action}</span></button>`;
+}
 $("#list").onclick = e => {
-  const pin = e.target.closest("[data-pin-kind]");
-  if (pin) {
-    const key = `${pin.dataset.pinKind}:${pin.dataset.pinId}`;
-    state.pinnedItems = state.pinnedItems.includes(key) ? state.pinnedItems.filter(item => item !== key) : [...state.pinnedItems, key];
-    store.set("pinnedItems", state.pinnedItems);
-    renderList();
-    $(`[data-pin-kind="${pin.dataset.pinKind}"][data-pin-id="${CSS.escape(pin.dataset.pinId)}"]`).focus();
-    return;
-  }
   const d = e.target.closest("[data-dismiss]");
   if (d) { state.jobs = state.jobs.filter(j => j.id !== d.dataset.dismiss); return renderList(); }
   const c = e.target.closest("[data-col]");
@@ -645,6 +661,7 @@ async function openCollection(id, quiet) {
     <div class="actions">
       ${ready.length ? `<button class="btn primary" data-open="${ready[0].id}"><span>Start reading</span></button>` : ""}
       <a class="btn" href="${esc(c.url || playAll)}" target="_blank" rel="noopener">${ICON.ext}<span>${c.kind === "playlist" ? "Open playlist" : "Play on YouTube"}</span></a>
+      ${pinButton("folder", c.id, c.title)}
     </div>
     ${c.total > c.items.length ? `<p class="col-note">The playlist has ${c.total} videos. YT Notes reads the first ${c.items.length}.</p>` : ""}
     <ol class="videos">${c.items.map((i, k) => `
@@ -676,6 +693,17 @@ function welcome() {
   renderList();
 }
 $("#view").addEventListener("click", e => {
+  const pin = e.target.closest("[data-pin-kind]");
+  if (pin) {
+    const kind = pin.dataset.pinKind, id = pin.dataset.pinId;
+    togglePin(kind, id);
+    const pinned = state.pinnedItems.includes(`${kind}:${id}`);
+    const action = pinned ? "Unpin" : "Pin";
+    pin.setAttribute("aria-pressed", pinned);
+    pin.setAttribute("aria-label", `${action} ${pin.dataset.pinTitle}`);
+    pin.querySelector("span").textContent = action;
+    return;
+  }
   const o = e.target.closest("[data-open]");
   if (o) { openNote(o.dataset.open); return; }
   const c = e.target.closest("[data-topic]");
@@ -858,6 +886,7 @@ function renderActions(msg, kind, pct) {
     <label class="vh" for="voice">Voice</label>
     <select class="voice" id="voice">${state.voices.map(v => `<option value="${v.id}" ${v.id === voice ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select>
     <a class="btn" href="https://youtu.be/${n.id}" target="_blank" rel="noopener">${ICON.ext}<span>Watch</span></a>
+    ${pinButton("note", n.id, n.title)}
     ${kind === "err" ? `<span class="act-msg err">${esc(msg)}</span>` : ""}
     <button class="btn del" id="del" aria-label="Delete notes" title="Delete notes" ${msg && kind !== "err" ? "disabled" : ""}>${ICON.trash}</button>`;
   $("#del").onclick = () => { state.confirmDelete = n.id; renderActions(); $("#del-yes").focus(); };
