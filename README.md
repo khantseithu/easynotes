@@ -13,6 +13,17 @@ Each note has these parts:
 - Action items as checkboxes.
 - A glossary that explains each abbreviation and jargon term.
 
+Tutorials get a different structure, so that you can follow along without watching the whole video:
+
+- The goal: what you build or learn.
+- The prerequisites: tools, versions and accounts.
+- Numbered steps, each with a link to its timestamp and the commands or code that it needs.
+- Gotchas: the errors and fixes that the presenter mentions.
+- The result, and what to try next.
+- A glossary.
+
+The app decides the kind of video by itself. To choose the structure yourself, use `--kind tutorial` or `--kind conversation`.
+
 The notes use plain English. The app gives the writing rules of the [simple-english](https://github.com/AminBlg/SimpleEnglish) skill to the model. Sentences are short, verbs are active, and the notes have no filler words.
 
 ## Requirements
@@ -89,6 +100,7 @@ You can also use YT Notes without the browser. Each command saves its result in 
 | `python3 ytnotes.py "https://www.youtube.com/playlist?list=PLAYLIST_ID"` | Writes notes for the first 50 videos of a playlist and saves the playlist as a collection. |
 | `python3 ytnotes.py "saas distribution" -t 60` | Writes notes for the best videos on a topic, about 60 minutes of video in total. |
 | `python3 ytnotes.py "https://youtu.be/VIDEO_ID" --audio --voice bm_george` | Writes notes and records the audio in the voice that you select. |
+| `python3 ytnotes.py "https://youtu.be/VIDEO_ID" --kind tutorial` | Writes notes with the tutorial structure. The choices are `auto` (the default), `conversation`, `talk`, and `tutorial`. |
 | `python3 ytnotes.py --add-glossary` | Adds a glossary to old notes that do not have one. |
 | `python3 ytnotes.py --model openai-codex/gpt-6-luna` | Uses a different model. See the Choose a model section. |
 | `python3 ytnotes.py --port 8766` | Starts the server on a different port. |
@@ -112,12 +124,14 @@ pi runs with its tools, sessions, extensions, and project files turned off. It g
 
 ## How it works
 
-The app makes a note in four steps:
+The app makes a note in these steps:
 
-1. yt-dlp gets the title, the channel, the length, and the English captions of the video.
+1. yt-dlp gets the title, the channel, the length, the chapters, the description, and the English captions of the video.
 2. If YouTube blocks the caption download, youtube-transcript-api gets the captions in a different way.
-3. pi or Claude Code writes the notes from the transcript. The prompt contains the note structure and the simple-english rules from `skills/simple-english/SKILL.md`.
-4. For audio, `tts.py` changes the notes into a spoken script and Kokoro records it. ffmpeg then compresses the recording to an `.m4a` file.
+3. The model reads the title, the description, and the start of the transcript, and decides if the video is a conversation, a talk, or a tutorial.
+4. For a tutorial, `context.py` reads the GitHub repos, gists, and docs pages that the description links to. From a repo, it reads the README, the file list, and a few key files. The model then uses the real code instead of guessing it from speech.
+5. pi or Claude Code writes the notes from the chapters, the linked sources, and the transcript. The prompt contains the note structure and the simple-english rules from `skills/simple-english/SKILL.md`.
+6. For audio, `tts.py` changes the notes into a spoken script and Kokoro records it. ffmpeg then compresses the recording to an `.m4a` file.
 
 ## Files
 
@@ -129,6 +143,7 @@ The project has these files and folders:
 | `ytnotes.html` | The app that opens in the browser. |
 | `tts.py` | The script that records audio with Kokoro. |
 | `ytlearn.py` | The video search and the playlist builder. |
+| `context.py` | The code that gets chapters and reads the repos and docs that a video links to. |
 | `llm.py` | The code that sends prompts to pi or Claude Code. |
 | `skills/simple-english/` | A copy of the simple-english skill, with its license and source. |
 | `assets/` | The app icon in SVG and PNG. |
