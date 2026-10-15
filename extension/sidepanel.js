@@ -31,7 +31,7 @@ const state = {
 
 async function loadIndex() {
   try {
-    state.notes = await api("/api/notes");
+    [state.notes, state.daily] = await Promise.all([api("/api/notes"), api("/api/daily").catch(() => null)]);
     state.offline = null;
     if (!state.voices.length) state.voices = await api("/api/voices").catch(() => []);
   } catch (e) {
@@ -127,6 +127,7 @@ function libraryView() {
     ${jobs.map(j => `<div class="job ${j.status === "error" ? "err" : ""}"><div class="t">${esc(j.label)}</div>
       <div class="m">${j.status === "error" ? "" : `<span class="spin"></span>`}<span>${esc(j.message || "Starting…")}</span>
       ${j.status === "error" ? `<button class="x" data-dismiss="${j.id}">Dismiss</button>` : ""}</div></div>`).join("")}
+    ${todayList()}
     <div class="lib-head"><strong>Library</strong><span>${(state.notes || []).length} notes${saved ? ` · ${dur(saved)} saved` : ""}</span></div>
     ${(state.notes || []).length > 6 ? `<input class="filter" id="q" type="search" placeholder="Filter notes" aria-label="Filter notes" value="${esc(state.q)}">` : ""}
     <ul class="list">${notes.length ? notes.map(n => `<li><button class="item" data-id="${n.id}">
@@ -151,7 +152,21 @@ function libraryView() {
     $("#q").setSelectionRange(pos, pos);
   });
   $("#view").querySelectorAll("[data-id]").forEach(b => b.onclick = () => { state.route = { kind: "note", id: b.dataset.id }; render(); scrollTo({ top: 0 }); });
+  // Opening a pick in the tab shows it here, with Make notes when it has no notes yet.
+  $("#view").querySelectorAll("[data-watch]").forEach(b => b.onclick = () => {
+    const url = `https://www.youtube.com/watch?v=${b.dataset.watch}`;
+    state.tab ? chrome.tabs.update(state.tab.id, { url }) : chrome.tabs.create({ url });
+  });
   $("#view").querySelectorAll("[data-dismiss]").forEach(b => b.onclick = async () => { await removeJob(b.dataset.dismiss); await syncJobs(); render(); });
+}
+
+function todayList() {
+  const d = state.daily;
+  if (!d?.sources?.length || !d.picks.length || d.date !== d.today) return "";
+  return `<div class="lib-head"><strong>Worth watching today</strong><span>${d.picks.length} picks</span></div>
+    <ul class="list">${d.picks.map(p => `<li><button class="item" data-watch="${esc(p.id)}">
+      <div class="t">${esc(p.title)}</div><div class="m"><span>${esc(p.channel)}</span>${p.secs ? `<span>${dur(p.secs)}</span>` : ""}${p.noted ? "<span>Notes ready</span>" : ""}</div>
+      ${p.why ? `<div class="why">${esc(p.why)}</div>` : ""}</button></li>`).join("")}</ul>`;
 }
 
 let shown = null;

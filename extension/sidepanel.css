@@ -147,6 +147,7 @@ h1 { font-size: 21px; line-height: 1.22; letter-spacing: -0.018em; margin: 0 0 1
 .job.err { border-style: solid; border-color: var(--danger); }
 .job.err .m { color: var(--danger); }
 .job .x { margin-left: auto; border: 0; background: none; color: var(--muted); font-size: 12px; padding: 2px 4px; }
+.item .why { font-size: 12.5px; line-height: 1.45; color: var(--text); margin-top: 4px; }
 .empty { padding: 10px 2px; font-size: 13px; color: var(--muted); }
 
 .card { margin: 22px 0; }
