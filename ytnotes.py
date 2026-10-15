@@ -17,6 +17,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import context
+import daily
 import llm
 import ytlearn
 
@@ -31,6 +32,8 @@ DEFAULT_MODEL = llm.DEFAULT_MODEL
 LOCK = threading.Lock()
 TTS_LOCK = threading.Lock()
 JOBS = {}
+DAILY = daily.Store(NOTES)
+DAILY_JOB = {}
 VOICES = [
     ("af_heart", "Heart · US female"), ("af_bella", "Bella · US female"),
     ("am_michael", "Michael · US male"), ("am_fenrir", "Fenrir · US male"),
@@ -210,6 +213,7 @@ def fetch(vid, workdir, langs):
         "id": vid,
         "title": info.get("title", vid),
         "channel": info.get("channel") or info.get("uploader", ""),
+        "channel_id": info.get("channel_id") or "",
         "secs": info.get("duration") or 0,
     }
     date = info.get("upload_date") or ""
@@ -715,6 +719,41 @@ def run_job(job, text, minutes, model, kind=None):
         job.update(status="error", message=str(e))
 
 
+def start_daily(model):
+    """Start building today's watch list, or return the build that is already running."""
+    with LOCK:
+        if DAILY_JOB.get("status") == "running":
+            return DAILY_JOB
+        DAILY_JOB.clear()
+        DAILY_JOB.update(id=uuid.uuid4().hex[:12], status="running", message="Starting…", ids=[])
+        JOBS[DAILY_JOB["id"]] = DAILY_JOB
+    threading.Thread(target=run_daily_job, args=(DAILY_JOB, model), daemon=True).start()
+    return DAILY_JOB
+
+
+def run_daily_job(job, model):
+    try:
+        data = daily.build(DAILY, load_index(), model, log=lambda m: job.update(message=m))
+        job.update(status="done", message=f"{len(data['picks'])} picks from {data['considered']} new videos")
+    except Exception as e:
+        job.update(status="error", message=str(e))
+
+
+def auto_daily(model):
+    """Make today's list once a day while the server runs, so it is ready when you open the app."""
+    while True:
+        if DAILY.sources() and not DAILY.list_for(datetime.now().date().isoformat()):
+            start_daily(model)
+        time.sleep(15 * 60)
+
+
+def daily_view():
+    today = datetime.now().date().isoformat()
+    data = DAILY.list_for(today) or DAILY.latest() or {"date": None, "picks": [], "considered": 0}
+    return {**daily.view(data, load_index()), "today": today, "sources": DAILY.sources(),
+            "job": DAILY_JOB if DAILY_JOB.get("status") == "running" else None}
+
+
 class Handler(BaseHTTPRequestHandler):
     model = DEFAULT_MODEL
 
@@ -785,6 +824,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(404, {"error": "not found"})
             return self.send(200, {**meta, "markdown": (NOTES / f"{meta['id']}.md").read_text(),
                                    "collections": note_collections(meta["id"])})
+        if self.path == "/api/daily":
+            return self.send(200, daily_view())
         if self.path == "/api/collections":
             return self.send(200, [collection_summary(c) for c in load_collections()])
         m = re.fullmatch(r"/api/collections/([\w-]+)", self.path)
@@ -805,6 +846,17 @@ class Handler(BaseHTTPRequestHandler):
             JOBS[job_id] = {"id": job_id, "status": "running", "message": "Starting…", "ids": []}
             threading.Thread(target=run_audio_job, args=(JOBS[job_id], m.group(1), voice), daemon=True).start()
             return self.send(202, JOBS[job_id])
+        if self.path == "/api/daily":
+            return self.send(202, start_daily(self.model))
+        if self.path == "/api/sources":
+            try:
+                if body.get("seed"):
+                    daily.seed(DAILY, load_index())
+                else:
+                    DAILY.add(daily.resolve(body.get("input") or ""))
+            except Exception as e:
+                return self.send(400, {"error": str(e)})
+            return self.send(200, DAILY.sources())
         if self.path != "/api/jobs":
             return self.send(404, {"error": "not found"})
         text = (body.get("input") or "").strip()
@@ -818,6 +870,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send(202, JOBS[job_id])
 
     def do_DELETE(self):
+        m = re.fullmatch(r"/api/sources/(UC[\w-]{22})", urlparse(self.path).path)
+        if m:
+            return self.send(200, DAILY.sources()) if DAILY.remove(m.group(1)) else self.send(404, {"error": "not found"})
         m = re.fullmatch(r"/api/notes/([\w-]{11})", urlparse(self.path).path)
         if not m:
             return self.send(404, {"error": "not found"})
@@ -849,6 +904,8 @@ def main():
     ap.add_argument("--voice", default=VOICES[0][0], choices=[v for v, _ in VOICES])
     ap.add_argument("--kind", choices=["auto", *KINDS], default="auto",
                     help="note structure to use; auto detects it from the video (default)")
+    ap.add_argument("--daily", action="store_true",
+                    help="make today's watch list from your channels; adds the channels of your notes the first time")
     ap.add_argument("--add-glossary", action="store_true", help="add a glossary to existing notes that lack one")
     args = ap.parse_args()
 
@@ -858,6 +915,18 @@ def main():
             added = list(ex.map(lambda n: add_glossary(n["id"], args.model), notes))
         for n, ok in zip(notes, added):
             print(f"{'added  ' if ok else 'skipped'} {n['title']}")
+        return
+
+    if args.daily:
+        if not DAILY.sources():
+            print(f"Added {daily.seed(DAILY, load_index())} channels from your notes", file=sys.stderr)
+        data = daily.build(DAILY, load_index(), args.model, log=lambda m: print(m, file=sys.stderr))
+        print(f"Worth watching · {data['date']} · {len(data['picks'])} of {data['considered']} new videos")
+        for i, p in enumerate(data["picks"], 1):
+            length = f" · {ytlearn.fmt_duration(p['secs'])}" if p.get("secs") else ""
+            print(f"\n{i}. {p['title']}\n   {p['channel']}{length} · https://youtu.be/{p['id']}\n   {p['why']}")
+        if data.get("error"):
+            print(data["error"], file=sys.stderr)
         return
 
     if args.input:
@@ -875,6 +944,7 @@ def main():
         return
 
     Handler.model = args.model
+    threading.Thread(target=auto_daily, args=(args.model,), daemon=True).start()
     server = ThreadingHTTPServer(("0.0.0.0" if args.lan else "127.0.0.1", args.port), Handler)
     url = f"http://127.0.0.1:{args.port}"
     print(f"YT Notes running at {url}  (Ctrl+C to stop)")

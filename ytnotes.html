@@ -265,6 +265,24 @@ h1 { font-family: var(--sans); font-size: 30px; line-height: 1.18; letter-spacin
 .video.pending h3, .video.skipped h3 { color: var(--muted); font-weight: 560; }
 .video .st { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-top: 6px; }
 .video.skipped .st { color: var(--danger); }
+.today-nav { padding: 0 12px 10px; }
+.video .why { font-family: var(--serif); font-size: 16.5px; line-height: 1.6; margin: 0 0 12px; }
+.video h3 a { color: inherit; text-decoration: none; }
+.video h3 a:hover { color: var(--accent); }
+.video .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.video .row .btn { height: 34px; font-size: 13.5px; }
+.video .row .st { margin-top: 0; }
+.sources { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--line); }
+.sources h2 { font-size: 17px; margin: 0 0 6px; }
+.sources > p { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
+.src-list { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.src-list li { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); background: var(--raised); border-radius: 99px; padding: 2px 4px 2px 12px; font-size: 13.5px; }
+.src-list a { color: inherit; text-decoration: none; }
+.src-list button { width: 28px; height: 28px; border: 0; border-radius: 99px; background: none; color: var(--faint); display: grid; place-items: center; }
+.src-list button:hover { background: var(--hover); color: var(--danger); }
+.src-add { display: flex; flex-wrap: wrap; gap: 8px; }
+.src-add input { flex: 1 1 220px; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--raised); color: var(--text); font-size: 14px; outline: none; }
+.src-add input:focus { border-color: var(--accent); }
 .col-note { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
 .pager { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); font-family: var(--sans); }
 .pager a { display: block; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; text-decoration: none; color: var(--text); background: var(--raised); }
@@ -381,6 +399,7 @@ h1 { font-family: var(--sans); font-size: 30px; line-height: 1.18; letter-spacin
     </div>
     <p class="hint" id="hint" aria-live="polite"></p>
   </form>
+  <div class="today-nav"><button class="item" id="today-btn" aria-current="false"><div class="t">Today</div><div class="m" id="today-meta">New videos worth watching</div></button></div>
   <div class="lib-head"><strong>Library</strong><span id="lib-stats"></span></div>
   <div class="filter" id="filter"><label class="vh" for="q">Filter notes</label><input id="q" type="search" placeholder="Filter notes"></div>
   <ul class="list" id="list" aria-live="polite"></ul>
@@ -546,6 +565,7 @@ function renderList() {
     </button></li>`).join("");
   const sections = colItems ? `<li class="lib-label">Playlists and topics</li>${colItems}${items ? `<li class="lib-label">Notes</li>${items}` : ""}` : items;
   $("#list").innerHTML = jobs + (sections || (state.jobs.length ? "" : `<li class="empty-lib">${state.q ? "No notes match." : "Notes you make will appear here."}</li>`));
+  todayMeta();
 }
 function togglePin(kind, id) {
   const key = `${kind}:${id}`;
@@ -1010,14 +1030,19 @@ if ("mediaSession" in navigator) {
 }
 new ResizeObserver(setPlayerH).observe(player);
 
-$("#composer").addEventListener("submit", async e => {
+$("#composer").addEventListener("submit", e => {
   e.preventDefault();
   const input = $("#in").value.trim();
   if (!input) return;
-  const job = { id: Math.random().toString(36).slice(2), label: input, message: "Starting…", status: "running" };
-  state.jobs.unshift(job);
   $("#in").value = "";
   $("#in").dispatchEvent(new Event("input"));
+  startJob(input);
+});
+
+// stay: keep the current view open when the notes are ready, for Make notes on the Today list.
+async function startJob(input, { label, stay } = {}) {
+  const job = { id: Math.random().toString(36).slice(2), label: label || input, message: "Starting…", status: "running" };
+  state.jobs.unshift(job);
   renderList();
   try {
     let j = await api("/api/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input, minutes: state.minutes }) });
@@ -1032,7 +1057,7 @@ $("#composer").addEventListener("submit", async e => {
         shown = j.ids.length;
         await Promise.all([loadNotes(), colId ? loadCollections() : null]);
         if (colId && state.current === "c:" + colId) openCollection(colId, true);
-        else if (!colId && shown === 1 && !state.current) openNote(j.ids[0]);
+        else if (!colId && shown === 1 && !state.current && !stay) openNote(j.ids[0]);
       }
       renderList();
     }
@@ -1042,14 +1067,14 @@ $("#composer").addEventListener("submit", async e => {
     state.jobs = state.jobs.filter(x => x !== job);
     renderList();
     if (colId) { if (state.current === "c:" + colId) openCollection(colId, true); }
-    else if (j.ids.length) openNote(j.ids[0]);
+    else if (j.ids.length && !stay) openNote(j.ids[0]);
     if (/skipped/.test(j.message)) { $("#hint").textContent = j.message; $("#hint").className = "hint err"; }
   } catch (err) {
     job.status = "error";
     job.message = err.message;
     renderList();
   }
-});
+}
 
 let lastY = 0;
 addEventListener("scroll", () => {
@@ -1057,8 +1082,118 @@ addEventListener("scroll", () => {
   if ((y > 80) !== (lastY > 80)) $("#topbar").classList.toggle("scrolled", y > 80);
   lastY = y;
 }, { passive: true });
+const ago = iso => { const h = Math.max(0, Math.round((Date.now() - new Date(iso)) / 36e5)); return h < 1 ? "just now" : h < 24 ? `${h}h ago` : `${Math.round(h / 24)}d ago`; };
+function todayMeta() {
+  const d = state.daily;
+  $("#today-btn").setAttribute("aria-current", String(state.current === "today"));
+  if (!d) return;
+  $("#today-meta").textContent = d.job ? d.job.message : !d.sources.length ? "Pick the channels you trust"
+    : d.date === d.today ? `${d.picks.length} worth watching` : "Not checked yet today";
+}
+async function loadDaily() { state.daily = await api("/api/daily"); todayMeta(); return state.daily; }
+async function openToday(quiet) {
+  state.current = "today"; state.note = null;
+  history.replaceState(null, "", "#today");
+  renderList();
+  $("#layout").classList.remove("has-toc");
+  $("#toc").innerHTML = "";
+  $("#top-title").textContent = "Today";
+  document.title = "Today · YT Notes";
+  let d;
+  try { d = await loadDaily(); } catch { return welcome(); }
+  if (state.current !== "today") return;
+  const isToday = d.date === d.today, making = new Set(state.jobs.filter(j => j.status === "running").map(j => j.vid));
+  const when = d.date ? new Date(d.date + "T12:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }) : "";
+  const status = d.job ? `<div class="st"><div class="spin"></div>${esc(d.job.message)}</div>`
+    : !d.sources.length ? "" : !d.date ? `<p class="col-note">The first list is not ready yet.</p>`
+    : !d.picks.length ? `<p class="col-note">Nothing new is worth your time${d.considered ? `. ${d.considered} new videos were checked` : ""}.</p>` : "";
+  $("#view").innerHTML = `
+    <div class="kicker"><span>${isToday ? "Today" : "Last list"}</span>${when ? `<span>${esc(when)}</span>` : ""}${d.sources.length ? `<span>From ${d.sources.length} channels you chose</span>` : ""}</div>
+    <h1>Worth watching</h1>
+    <div class="actions">
+      ${d.sources.length ? `<button class="btn" id="daily-run" ${d.job ? "disabled" : ""}><span>${isToday ? "Check again" : "Check for new videos"}</span></button>` : ""}
+      ${d.picks.length ? `<a class="btn" href="https://www.youtube.com/watch_videos?video_ids=${d.picks.map(p => p.id).join(",")}" target="_blank" rel="noopener">${ICON.ext}<span>Play all on YouTube</span></a>` : ""}
+    </div>
+    ${status}${d.error ? `<p class="col-note">${esc(d.error)}</p>` : ""}
+    <ol class="videos">${d.picks.map((p, k) => `
+      <li class="video">
+        <div class="num">${k + 1}</div>
+        <div>
+          <h3><a href="https://www.youtube.com/watch?v=${esc(p.id)}" target="_blank" rel="noopener">${esc(p.title)}</a></h3>
+          <div class="vm">${esc(p.channel)}${p.secs ? ` · ${dur(p.secs)}` : ""} · ${ago(p.published)}</div>
+          ${p.why ? `<p class="why">${esc(p.why)}</p>` : ""}
+          <div class="row">
+            ${p.noted ? `<button class="btn primary" data-open="${esc(p.id)}"><span>Read notes</span></button>`
+              : making.has(p.id) ? `<div class="st"><div class="spin"></div>Writing notes…</div>`
+              : `<button class="btn primary" data-make="${esc(p.id)}" data-title="${esc(p.title)}"><span>Make notes</span></button>`}
+            <a class="btn" href="https://www.youtube.com/watch?v=${esc(p.id)}" target="_blank" rel="noopener">${ICON.ext}<span>Watch</span></a>
+          </div>
+        </div>
+      </li>`).join("")}
+    </ol>
+    <section class="sources" aria-labelledby="src-h">
+      <h2 id="src-h">Your channels</h2>
+      <p>${d.sources.length ? "The list only uses new uploads from these channels. YouTube's recommendations are not used." : "Pick the channels you trust. Each day the app reads their new uploads and keeps only the ones worth your time."}</p>
+      ${d.sources.length ? `<ul class="src-list">${d.sources.map(s => `<li><a href="https://www.youtube.com/channel/${esc(s.id)}" target="_blank" rel="noopener">${esc(s.name)}</a><button data-unsrc="${esc(s.id)}" aria-label="Remove ${esc(s.name)}" title="Remove">${ICON.trash}</button></li>`).join("")}</ul>` : ""}
+      <form class="src-add" id="src-add">
+        <label class="vh" for="src-in">Channel link or @handle</label>
+        <input id="src-in" placeholder="Channel link, @handle or a video link" autocomplete="off">
+        <button class="btn" id="src-go"><span>Add channel</span></button>
+        ${state.notes.length ? `<button class="btn" type="button" id="src-seed"><span>Add the channels in my notes</span></button>` : ""}
+      </form>
+      <p class="hint" id="src-hint" aria-live="polite"></p>
+    </section>`;
+  if (!quiet) scrollTo({ top: 0 });
+  if (d.job) pollDaily(d.job.id);
+}
+async function pollDaily(id) {
+  if (state.dailyPoll === id) return;
+  state.dailyPoll = id;
+  let j = { status: "running" };
+  while (j.status === "running") {
+    await new Promise(r => setTimeout(r, 2000));
+    try { j = await api(`/api/jobs/${id}`); } catch { break; }
+    if (state.daily?.job) { state.daily.job.message = j.message; todayMeta(); }
+    if (state.current === "today") { const st = $("#view .st"); if (st && j.status === "running") st.lastChild.textContent = j.message; }
+  }
+  state.dailyPoll = null;
+  if (state.current === "today") openToday(true); else loadDaily();
+}
+async function sourcesCall(opts, busy) {
+  const hint = $("#src-hint");
+  hint.className = "hint"; hint.textContent = busy;
+  document.querySelectorAll("#src-add button").forEach(b => b.disabled = true);
+  try {
+    const before = state.daily?.sources.length || 0;
+    const list = await api(opts.url || "/api/sources", { method: opts.method || "POST", headers: { "Content-Type": "application/json" }, body: opts.body && JSON.stringify(opts.body) });
+    await openToday(true);
+    if (!before && list.length && !state.daily.date) { await api("/api/daily", { method: "POST" }); openToday(true); }
+  } catch (err) { hint.className = "hint err"; hint.textContent = err.message; document.querySelectorAll("#src-add button").forEach(b => b.disabled = false); }
+}
+$("#today-btn").onclick = () => { openToday(); if (mq.matches) side(false); };
+$("#view").addEventListener("submit", e => {
+  if (e.target.id !== "src-add") return;
+  e.preventDefault();
+  const v = $("#src-in").value.trim();
+  if (v) sourcesCall({ body: { input: v } }, "Finding the channel…");
+});
+$("#view").addEventListener("click", async e => {
+  if (state.current !== "today") return;
+  const make = e.target.closest("[data-make]"), un = e.target.closest("[data-unsrc]");
+  if (make) {
+    make.outerHTML = `<div class="st"><div class="spin"></div>Writing notes…</div>`;
+    const run = startJob(`https://youtu.be/${make.dataset.make}`, { label: make.dataset.title, stay: true });
+    state.jobs[0].vid = make.dataset.make;
+    await run;
+    if (state.current === "today") openToday(true);
+  } else if (un) sourcesCall({ url: `/api/sources/${un.dataset.unsrc}`, method: "DELETE" }, "Removing…");
+  else if (e.target.closest("#src-seed")) sourcesCall({ body: { seed: true } }, "Finding the channels of your notes…");
+  else if (e.target.closest("#daily-run")) { await api("/api/daily", { method: "POST" }); openToday(true); }
+});
+
 function route() {
   const h = decodeURIComponent(location.hash.slice(1));
+  if (h === "today") { if (state.current !== "today") openToday(); return true; }
   if (h.startsWith("c/")) { if (state.current !== "c:" + h.slice(2)) openCollection(h.slice(2)); return true; }
   if (/^[\w-]{11}$/.test(h) && state.notes.some(n => n.id === h)) { if (state.current !== h) openNote(h); return true; }
   return false;
@@ -1069,9 +1204,10 @@ applyTheme();
 renderSeg();
 $("#p-speed").textContent = `${store.get("speed", 1)}×`;
 syncPlayer();
-Promise.all([api("/api/voices").then(v => { state.voices = v; }), loadNotes(), loadCollections()]).then(() => {
+Promise.all([api("/api/voices").then(v => { state.voices = v; }), loadNotes(), loadCollections(), loadDaily().catch(() => null)]).then(() => {
   if (route()) return;
-  if (state.notes.length) openNote(state.notes[0].id);
+  if (state.daily?.sources.length) openToday();
+  else if (state.notes.length) openNote(state.notes[0].id);
   else welcome();
 });
 </script>

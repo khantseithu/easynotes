@@ -74,6 +74,19 @@ To delete a note, select the trash button next to Listen, and then select Delete
 
 Glossary terms have a dotted underline in the text. Select a term to see what it means. The full glossary is at the end of each note.
 
+## Today: a daily watch list
+
+Today is a short list of new videos that are worth your time. It uses only the channels that you choose, so YouTube's recommendations do not decide what you see.
+
+1. Select Today at the top of the library.
+2. Add the channels that you trust. Paste a channel link, an @handle, or a link to one of its videos. Or select Add the channels in my notes.
+3. The app reads the new uploads of each channel from its RSS feed. It leaves out Shorts, live streams, videos from more than 3 days ago, videos that you already have notes for, and videos that were on an earlier list.
+4. The model reads the titles and descriptions, compares them with the notes in your library, and keeps up to 8 videos. Each pick has one line that says what you get from it.
+
+Select Make notes to read a pick instead of watching it. While the server runs, it makes a new list once a day. Select Check again to make it now. The Chrome extension shows the same list above the library.
+
+To make the list from the command line, run `python3 ytnotes.py --daily`. The first time, it adds the channels of your notes.
+
 ## Use the app on your phone
 
 Your phone and your Mac must be on the same Wi-Fi network. Start the server with the `--lan` flag:
@@ -104,6 +117,7 @@ You can also use YT Notes without the browser. Each command saves its result in 
 | `python3 ytnotes.py "saas distribution" -t 60` | Writes notes for the best videos on a topic, about 60 minutes of video in total. |
 | `python3 ytnotes.py "https://youtu.be/VIDEO_ID" --audio --voice bm_george` | Writes notes and records the audio in the voice that you select. |
 | `python3 ytnotes.py "https://youtu.be/VIDEO_ID" --kind tutorial` | Writes notes with the tutorial structure. The choices are `auto` (the default), `conversation`, `talk`, and `tutorial`. |
+| `python3 ytnotes.py --daily` | Makes today's watch list from your channels and prints it. |
 | `python3 ytnotes.py --add-glossary` | Adds a glossary to old notes that do not have one. |
 | `python3 ytnotes.py --model openai-codex/gpt-6-luna` | Uses a different model. See the Choose a model section. |
 | `python3 ytnotes.py --port 8766` | Starts the server on a different port. |
@@ -147,6 +161,7 @@ The project has these files and folders:
 | `ytnotes.html` | The app that opens in the browser. |
 | `tts.py` | The script that records audio with Kokoro. |
 | `ytlearn.py` | The video search and the playlist builder. |
+| `daily.py` | The daily watch list: your channels, their RSS feeds, and the picks. |
 | `ROADMAP.md` | Ideas for improving tutorial notes. |
 | `context.py` | The code that gets chapters and reads the repos and docs that a video links to. |
 | `llm.py` | The code that sends prompts to pi or Claude Code. |
