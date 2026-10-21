@@ -1,8 +1,8 @@
-<p align="center"><img src="assets/icon.svg" width="96" alt="YT Notes icon"></p>
+<p align="center"><img src="assets/icon.svg" width="96" alt="EasyNotes icon"></p>
 
-# YT Notes
+# EasyNotes
 
-YT Notes turns a YouTube video into notes that you can read in a few minutes. You paste one or more links, a playlist, or a topic. The app writes the notes and can record an audio version on your Mac.
+EasyNotes turns YouTube videos and article pages into notes that you can read in a few minutes. Paste one or more links, a playlist, or a topic. The app writes the notes and can record an audio version of supported YouTube notes on your Mac.
 
 Each note has these parts:
 
@@ -27,11 +27,11 @@ The app decides the kind of video by itself. To choose the structure yourself, u
 
 English notes use plain English. The app gives the writing rules of the [simple-english](https://github.com/AminBlg/SimpleEnglish) skill to the model. Sentences are short, verbs are active, and the notes have no filler words.
 
-Burmese videos get Burmese notes. Audio is unavailable for Burmese notes because the current Kokoro voices do not support Burmese.
+Burmese videos and articles get Burmese notes. Audio is unavailable for Burmese notes because the current Kokoro voices do not support Burmese.
 
 ## Requirements
 
-YT Notes runs on macOS. The audio feature needs a Mac with Apple silicon. Install these tools before you start:
+EasyNotes runs on macOS. The audio feature needs a Mac with Apple silicon. Install these tools before you start:
 
 - Python 3.10 or later.
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp), which gets the video data and the captions.
@@ -109,7 +109,7 @@ To install it, go to `chrome://extensions`, turn on Developer mode, select Load 
 
 ## Command line
 
-You can also use YT Notes without the browser. Each command saves its result in the `notes/` folder:
+You can also use EasyNotes without the browser. Each command saves its result in the `notes/` folder:
 
 | Command | Result |
 |---|---|
@@ -187,7 +187,7 @@ These are the errors that you can see, and what to do:
 
 ## Credits
 
-YT Notes uses work from these projects:
+EasyNotes uses work from these projects:
 
 - [pi](https://github.com/earendil-works/pi) and [Claude Code](https://claude.com/claude-code), which run the models.
 - [simple-english](https://github.com/AminBlg/SimpleEnglish) by AminBlg, MIT license. A copy is in `skills/simple-english/`.

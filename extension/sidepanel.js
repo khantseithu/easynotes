@@ -69,8 +69,8 @@ async function render() {
 function offlineView() {
   $("#view").innerHTML = `
     <div class="card">
-      <h1>Start YT Notes</h1>
-      <p>The extension can't reach the YT Notes server at <code>${esc(state.server)}</code>. Start it on your Mac:</p>
+      <h1>Start EasyNotes</h1>
+      <p>The extension can't reach the EasyNotes server at <code>${esc(state.server)}</code>. Start it on your Mac:</p>
       <p><code>python3 ytnotes.py --no-open</code></p>
       <p>Then come back here. To use a different address, open Settings.</p>
       <button class="btn primary" id="retry">Try again</button>
@@ -417,7 +417,7 @@ async function play(n) {
     const resume = await local.get(`pos:${n.id}`, 0);
     audio.addEventListener("loadedmetadata", () => { if (resume && resume < audio.duration - 5) audio.currentTime = resume; }, { once: true });
     $("#p-title").textContent = n.title;
-    navigator.mediaSession.metadata = new MediaMetadata({ title: n.title, artist: n.channel, album: "YT Notes" });
+    navigator.mediaSession.metadata = new MediaMetadata({ title: n.title, artist: n.channel, album: "EasyNotes" });
   }
   audio.playbackRate = await local.get("speed", 1);
   player.classList.add("on");
@@ -466,7 +466,7 @@ async function poll() {
   for (const job of Object.values(state.jobs).filter(j => j.status === "running")) {
     let j;
     try { j = await api(`/api/jobs/${job.id}`); } catch (e) {
-      j = { status: "error", message: /not found/i.test(e.message) ? "The YT Notes server restarted. Try again." : e.message };
+      j = { status: "error", message: /not found/i.test(e.message) ? "The EasyNotes server restarted. Try again." : e.message };
     }
     const jobs = await getJobs();
     if (!jobs[job.id]) continue;

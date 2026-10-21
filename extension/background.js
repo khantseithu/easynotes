@@ -6,7 +6,7 @@ let index = { at: 0, ids: new Set() };
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({ id: "notes-link", title: "Make notes with YT Notes", contexts: ["link"], targetUrlPatterns: YT });
+  chrome.contextMenus.create({ id: "notes-link", title: "Make notes with EasyNotes", contexts: ["link"], targetUrlPatterns: YT });
   chrome.contextMenus.create({ id: "notes-page", title: "Make notes for this video", contexts: ["page", "video"], documentUrlPatterns: YT });
 });
 
@@ -17,7 +17,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (tab?.id !== undefined) chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
   startJob(`https://www.youtube.com/watch?v=${vid}`, 60, vid).catch(e => {
     chrome.action.setBadgeText({ tabId: tab?.id, text: "!" });
-    chrome.action.setTitle({ tabId: tab?.id, title: `YT Notes: ${e.message}` });
+    chrome.action.setTitle({ tabId: tab?.id, title: `EasyNotes: ${e.message}` });
   });
 });
 
@@ -38,7 +38,7 @@ async function badge(tabId, url) {
   const has = vid && (await noteIds()).has(vid);
   chrome.action.setBadgeBackgroundColor({ tabId, color: "#3f56b2" });
   chrome.action.setBadgeText({ tabId, text: has ? "✓" : "" });
-  chrome.action.setTitle({ tabId, title: has ? "YT Notes: notes ready for this video" : "YT Notes" });
+  chrome.action.setTitle({ tabId, title: has ? "EasyNotes: notes ready for this video" : "EasyNotes" });
 }
 
 chrome.tabs.onUpdated.addListener((tabId, change, tab) => { if (change.url || change.status === "complete") badge(tabId, tab.url); });
