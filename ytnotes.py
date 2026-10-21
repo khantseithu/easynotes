@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 import context
 import daily
 import llm
+import transcript
 import ytlearn
 
 ROOT = Path(__file__).resolve().parent
@@ -47,12 +48,14 @@ KINDS = ("conversation", "talk", "tutorial")
 GLOSSARY_SECTION = """## Glossary
 Every abbreviation and acronym used anywhere in the notes above (e.g. LTV, CAC, ARR, ICP, PLG), plus industry jargon
 a smart newcomer to the field would not know (e.g. churn, payback period). Skip everyday words, product names and analogies entirely: never list a skipped term or comment on what you skipped.
-Sort alphabetically, as "- **TERM** (full name, if it is an abbreviation): one plain-English sentence explaining it, in the context of this video."
+Sort alphabetically, as "- **TERM** (full name, if it is an abbreviation): one clear {language} sentence explaining it, in the context of this video."
 Omit this section only if the notes use no such terms."""
 
 NOTES_PROMPT = """Turn the YouTube transcript on stdin into notes good enough that the reader does not need to watch the video.
 
 Video: "{title}" by {channel} ({duration})
+
+Write the notes in the requested output language.
 
 Write markdown in exactly this structure:
 
@@ -73,7 +76,7 @@ Only if the video teaches named models or step-by-step processes. Lay each out c
 ## Action items
 Concrete things to do, as "- [ ] ..." checkboxes.
 
-""" + GLOSSARY_SECTION + """
+""" + GLOSSARY_SECTION.format(language="English") + """
 
 Length should match the substance: about 300 words for a 10-minute video, up to about 1500 for a long interview.
 Use only what is in the transcript, except glossary definitions, which may use general knowledge. Timestamps must come from the [mm:ss] markers in the transcript.
@@ -81,14 +84,14 @@ Output only the notes."""
 
 GLOSSARY_PROMPT = """The notes on stdin were written from a YouTube video. Write a glossary for them.
 
-""" + GLOSSARY_SECTION + """
-
 Output only the "## Glossary" section, or nothing if there are no such terms."""
 
 TUTORIAL_PROMPT = """Turn the YouTube tutorial on stdin into notes that let the reader follow along and build the same thing
 without watching the whole video. They should only need to watch a short clip when a step is hard to follow.
 
 Video: "{title}" by {channel} ({duration}, published {published})
+
+Write the notes in the requested output language.
 
 Write markdown in exactly this structure:
 
@@ -112,7 +115,7 @@ Bullets: the errors, warnings and pitfalls that the presenter hits or mentions, 
 ## Result
 What the reader has at the end, and the next steps or extensions that the video suggests.
 
-""" + GLOSSARY_SECTION + """
+""" + GLOSSARY_SECTION.format(language="English") + """
 
 Sources. Stdin can contain these blocks before the transcript:
 - "Chapters": the video's own chapters. Use them to shape the steps, but split or merge chapters when a step needs it.
@@ -156,6 +159,28 @@ Self-check: {doc_check.removeprefix("2. Document: ")}
 WRITING_RULES = simple_english_rules()
 
 
+def output_language_rules(language):
+    if language == "my":
+        return """
+Write in clear, natural Burmese for a Burmese reader. Use Burmese for explanations and prose, including glossary definitions.
+Keep the required English markdown section headings exactly as written so the app can recognize them. Tutorial step headings may be Burmese.
+Write all explanatory prose in Burmese. Keep Latin text only for names, technical terms, code, commands, file names, versions, numbers, and verbatim source text where appropriate. Explain technical terms in Burmese; include the original English term when that helps identify it. Do not use unrelated scripts, or include drafting, translation, or self-review remarks. Return only the requested note.
+"""
+    return "Write in English.\n" + WRITING_RULES
+
+
+def notes_prompt(kind, language):
+    prompt = TUTORIAL_PROMPT if kind == "tutorial" else NOTES_PROMPT
+    section = GLOSSARY_SECTION.format(language="Burmese" if language == "my" else "English")
+    prompt = prompt.replace(GLOSSARY_SECTION.format(language="English"), section)
+    return prompt + "\n\n" + output_language_rules(language)
+
+
+def glossary_prompt(language):
+    section = GLOSSARY_SECTION.format(language="Burmese" if language == "my" else "English")
+    return GLOSSARY_PROMPT + "\n\n" + section + "\n\n" + output_language_rules(language)
+
+
 def video_id(text):
     text = text.strip()
     m = re.search(r"(?:v=|youtu\.be/|shorts/|live/|embed/)([\w-]{11})", text)
@@ -180,16 +205,20 @@ def video_info(vid):
         return None
 
 
-def api_transcript(vid):
+def api_transcript(vid, language="en"):
     out = subprocess.run(["uvx", "-q", "--from", "youtube-transcript-api==1.2.4", "youtube_transcript_api", vid,
-                          "--languages", "en", "--format", "json"], capture_output=True, text=True, timeout=180)
+                          "--languages", language, "--format", "json"], capture_output=True, text=True, timeout=180)
     try:
         return [(c["start"], c["text"]) for c in json.loads(out.stdout)[0]]
     except (json.JSONDecodeError, IndexError, KeyError, TypeError):
         return []
 
 
-def fetch(vid, workdir, langs):
+def fetch(vid, workdir):
+    info = video_info(vid)
+    if not info:
+        return None, None, None
+    langs, api_languages = transcript.caption_languages(info.get("language"))
     subprocess.run(
         ["yt-dlp", "--skip-download", "--write-info-json", "--write-auto-subs", "--write-subs",
          "--sub-langs", langs, "--sub-format", "json3", "--quiet", "--no-warnings",
@@ -197,16 +226,30 @@ def fetch(vid, workdir, langs):
         capture_output=True, timeout=180,
     )
     info_file = Path(workdir) / f"{vid}.info.json"
-    subs = sorted(Path(workdir).glob(f"{vid}*.json3"))
-    info = json.loads(info_file.read_text()) if info_file.exists() else video_info(vid)
-    if not info:
-        return None, None, None
-    if subs:
+    info = json.loads(info_file.read_text()) if info_file.exists() else info
+    subs = transcript.order_caption_files(list(Path(workdir).glob(f"{vid}*.json3")), vid, info.get("language"))
+    segments = []
+    transcript_language = "my" if (info.get("language") or "").lower().startswith("my") else "en"
+    for sub in subs:
+        try:
+            data = json.loads(sub.read_text())
+        except json.JSONDecodeError:
+            continue
+        segments = [(e.get("tStartMs", 0) / 1000, "".join(s.get("utf8", "") for s in e.get("segs", [])))
+                    for e in data.get("events", [])]
+        if any(text.strip() for _, text in segments):
+            suffix = sub.name[len(vid) + 1:-len(".json3")]
+            if suffix.startswith("my"):
+                transcript_language = "my"
+            break
         segments = []
-        for e in json.loads(subs[0].read_text()).get("events", []):
-            segments.append((e.get("tStartMs", 0) / 1000, "".join(s.get("utf8", "") for s in e.get("segs", []))))
-    else:
-        segments = api_transcript(vid)
+    if not segments:
+        for language in api_languages:
+            segments = api_transcript(vid, language)
+            if segments:
+                if language == "my":
+                    transcript_language = "my"
+                break
     if not segments:
         return None, None, None
     meta = {
@@ -215,6 +258,7 @@ def fetch(vid, workdir, langs):
         "channel": info.get("channel") or info.get("uploader", ""),
         "channel_id": info.get("channel_id") or "",
         "secs": info.get("duration") or 0,
+        "language": transcript_language,
     }
     date = info.get("upload_date") or ""
     if re.fullmatch(r"\d{8}", date):
@@ -398,16 +442,17 @@ def make_notes(vid, model, log=print, kind=None):
         return existing
     with tempfile.TemporaryDirectory() as workdir:
         meta, transcript, extra = None, None, None
-        for wait, langs in [(0, "en"), (5, "en.*"), (20, "en"), (45, "en.*")]:
+        for wait in (0, 5, 20, 45):
             time.sleep(wait)
-            meta, transcript, extra = fetch(vid, workdir, langs)
+            meta, transcript, extra = fetch(vid, workdir)
             if transcript:
                 break
     if not transcript:
-        raise RuntimeError(f"No English transcript available for {vid}")
+        raise RuntimeError(f"No English or Burmese transcript available for {vid}")
     if kind not in KINDS:
         log(f"Checking what kind of video this is: {meta['title']}")
-        kind = detect_kind(meta, extra, transcript, model)
+        kind = detect_kind(meta, extra, transcript,
+                           llm.model_for_language(meta.get("language", "en"), model))
     meta["kind"] = kind
     blocks = []
     if extra["chapters"]:
@@ -418,16 +463,18 @@ def make_notes(vid, model, log=print, kind=None):
         if found:
             blocks.append("## Linked sources\n" + found)
             meta["sources"] = used
-        prompt = TUTORIAL_PROMPT.format(**fmt, published=meta.get("published", "date unknown"))
+        prompt = notes_prompt(kind, meta.get("language", "en")).format(**fmt, published=meta.get("published", "date unknown"))
         heading = "## Goal"
     else:
-        prompt = NOTES_PROMPT.format(**fmt)
+        prompt = notes_prompt(kind, meta.get("language", "en")).format(**fmt)
         if extra["chapters"]:
             prompt += "\nThe video's own chapters come before the transcript on stdin. Use them to group the key ideas."
         heading = "## TL;DR"
     log(f"Writing {kind} notes: {meta['title']}")
     stdin = "\n\n".join(blocks + ["## Transcript\n" + transcript]) if blocks else transcript
-    out = llm.run(prompt + WRITING_RULES, model, stdin[:400000])
+    source = stdin[:400000]
+    out = llm.run_burmese(prompt, model, source, source) if meta.get("language") == "my" \
+        else llm.run(prompt, model, source)
     body = out.stdout.strip()
     if out.returncode != 0 or not body.startswith(heading):
         reason = (out.stderr.strip() or body).splitlines()[-1][:200] if (out.stderr.strip() or body) else "no output"
@@ -489,6 +536,8 @@ def make_audio(vid, voice, log=print):
     meta = next((n for n in load_index() if n["id"] == vid), None)
     if not meta:
         raise RuntimeError("Note not found")
+    if meta.get("language") == "my":
+        raise RuntimeError("Burmese audio is not supported yet")
     if meta.get("audio", {}).get("voice") == voice and (NOTES / f"{vid}.m4a").exists():
         return meta
     log("Waiting for the voice engine…")
@@ -545,7 +594,9 @@ def add_glossary(vid, model):
     md = path.read_text()
     if re.search(r"^## Glossary", md, re.M):
         return False
-    out = llm.run(GLOSSARY_PROMPT + WRITING_RULES, model, md, timeout=300)
+    language = next((n.get("language", "en") for n in load_index() if n["id"] == vid), "en")
+    out = llm.run_burmese(glossary_prompt(language), model, md, md, timeout=300) if language == "my" \
+        else llm.run(glossary_prompt(language), model, md, timeout=300)
     out = out.stdout.strip() if out.returncode == 0 else ""
     if not out.startswith("## Glossary"):
         return False
@@ -755,7 +806,7 @@ def daily_view():
 
 
 class Handler(BaseHTTPRequestHandler):
-    model = DEFAULT_MODEL
+    model = None
 
     def log_message(self, *args):
         pass
@@ -895,8 +946,8 @@ def main():
     ap = argparse.ArgumentParser(description="Read YouTube videos instead of watching them.")
     ap.add_argument("input", nargs="*", help="YouTube links, playlist links, or a topic; omit to open the app")
     ap.add_argument("-t", "--time", type=int, default=60, help="minutes of video to cover for a topic")
-    ap.add_argument("--model", default=DEFAULT_MODEL,
-                    help=f"pi model as provider/model (default {DEFAULT_MODEL}), or a Claude model such as claude-haiku-5-5")
+    ap.add_argument("--model", default=None,
+                    help=f"pi model as provider/model (default: English {DEFAULT_MODEL}, Burmese {llm.BURMESE_MODEL}; explicit choice applies to both), or a Claude model such as claude-haiku-5-5")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true", help="don't open the browser")
     ap.add_argument("--lan", action="store_true", help="also serve on your local network, e.g. for your phone")
