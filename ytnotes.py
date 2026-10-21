@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -9,6 +10,7 @@ import threading
 import time
 import urllib.parse
 import uuid
+import unicodedata
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -494,6 +496,54 @@ def make_notes(vid, model, log=print, kind=None):
     return save_note(meta, link_stamps(body, vid))
 
 
+def make_article_notes(url, model, log=print):
+    article_id = "a" + hashlib.sha256(url.encode()).hexdigest()[:10]
+    existing = next((n for n in load_index() if n["id"] == article_id), None)
+    if existing and (NOTES / f"{article_id}.md").exists():
+        return existing
+    log(f"Reading article: {url}")
+    page = context.page_text(context.get(url))
+    if len(page.strip()) < 200:
+        raise RuntimeError("Could not extract enough article text")
+    lines = page.splitlines()
+    title = lines[0].strip()[:300] or url
+    article = "\n".join(lines[1:]).strip()
+    language = article_language(article)
+    host = urlparse(url).hostname or url
+    prompt = f'''Turn the article on stdin into useful notes for someone who wants its main ideas without rereading it.
+
+Article: "{title}" ({host})
+
+Write markdown in exactly this structure:
+
+## TL;DR
+One sentence.
+
+## Key ideas
+3 to 7 concrete, useful takeaways.
+
+## Action items
+Concrete things to do, as "- [ ] ..." checkboxes. Omit if there are none.
+
+{GLOSSARY_SECTION.format(language="Burmese" if language == "my" else "English")}
+
+Use only information in the article, except glossary definitions. Output only the notes.'''
+    prompt += "\n\n" + output_language_rules(language)
+    source = article[:400000]
+    out = llm.run_burmese(prompt, model, source, source) if language == "my" else llm.run(prompt, model, source)
+    result = out.stdout.strip()
+    if out.returncode != 0 or not result.startswith("## TL;DR"):
+        reason = (out.stderr.strip() or result).splitlines()[-1][:200] if (out.stderr.strip() or result) else "no output"
+        raise RuntimeError(f"Article notes failed: {reason}")
+    meta = {"id": article_id, "title": title, "channel": host.removeprefix("www."), "url": url,
+            "secs": 0, "language": language, "kind": "article"}
+    return save_note(meta, result)
+
+
+def article_language(text):
+    return "my" if sum("MYANMAR" in unicodedata.name(c, "") for c in text) > 10 else "en"
+
+
 def update_meta(vid, **fields):
     with LOCK:
         index = load_index()
@@ -675,7 +725,7 @@ def note_collections(vid):
 
 def parse_input(text):
     urls = re.findall(r"https?://\S+|(?:www\.)?(?:youtube\.com|youtu\.be)/\S+", text)
-    videos, playlists = [], []
+    videos, playlists, articles = [], [], []
     for u in urls:
         parsed = urllib.parse.urlparse(u if u.startswith("http") else "https://" + u)
         lst = urllib.parse.parse_qs(parsed.query).get("list", [""])[0]
@@ -683,13 +733,15 @@ def parse_input(text):
             playlists.append(lst)
         elif video_id(u):
             videos.append(video_id(u))
+        elif parsed.scheme in ("http", "https") and parsed.hostname:
+            articles.append(u.rstrip(".,;!"))
     if urls:
-        if not videos and not playlists:
-            raise RuntimeError("No YouTube video or playlist links found")
-        return videos, playlists, ""
+        if not videos and not playlists and not articles:
+            raise RuntimeError("No supported links found")
+        return videos, playlists, articles, ""
     if video_id(text):
-        return [video_id(text)], [], ""
-    return [], [], text.strip()
+        return [video_id(text)], [], [], ""
+    return [], [], [], text.strip()
 
 
 def expand_playlist(pid):
@@ -720,7 +772,7 @@ def run_job(job, text, minutes, model, kind=None):
         job["message"] = msg
 
     try:
-        videos, playlists, topic = parse_input(text)
+        videos, playlists, articles, topic = parse_input(text)
         collections = []
         if topic:
             log(f"Finding the best videos on “{topic}”…")
@@ -739,26 +791,29 @@ def run_job(job, text, minutes, model, kind=None):
         for c in collections:
             save_collection(c)
         vids = list(dict.fromkeys(videos + [v["id"] for c in collections for v in c["videos"]]))
-        if not vids:
+        if not vids and not articles:
             raise RuntimeError("The playlist has no public videos")
-        title = collections[0]["title"] if len(collections) == 1 and not videos else (f"{len(vids)} videos" if len(vids) > 1 else None)
-        job.update(collections=[c["id"] for c in collections], title=title, total=len(vids), done=0)
-        log(f"Reading {len(vids)} video{'s' if len(vids) > 1 else ''}…")
+        work = [("video", v) for v in vids] + [("article", u) for u in dict.fromkeys(articles)]
+        title = collections[0]["title"] if len(collections) == 1 and not videos and not articles else (f"{len(work)} sources" if len(work) > 1 else None)
+        job.update(collections=[c["id"] for c in collections], title=title, total=len(work), done=0)
+        log(f"Reading {len(work)} source{'s' if len(work) != 1 else ''}…")
         done, errors = [], {}
 
-        def one(v):
+        def one(item):
+            source_type, value = item
             try:
-                note = make_notes(v, model, log if len(vids) == 1 else (lambda m: None), kind)
+                note = make_article_notes(value, model, log if len(work) == 1 else (lambda m: None)) if source_type == "article" \
+                    else make_notes(value, model, log if len(work) == 1 else (lambda m: None), kind)
                 done.append(note["id"])
             except Exception as e:
-                errors[v] = str(e)
+                errors[value] = str(e)
             finished = len(done) + len(errors)
             job.update(ids=list(done), done=finished)
-            if len(vids) > 1:
-                log(f"{finished} of {len(vids)} done")
+            if len(work) > 1:
+                log(f"{finished} of {len(work)} done")
 
         with ThreadPoolExecutor(3) as ex:
-            list(ex.map(one, vids))
+            list(ex.map(one, work))
         for c in collections:
             c["skipped"] = {v["id"]: errors[v["id"]] for v in c["videos"] if v["id"] in errors}
             save_collection(c)
@@ -912,7 +967,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(404, {"error": "not found"})
         text = (body.get("input") or "").strip()
         if not text:
-            return self.send(400, {"error": "Paste a YouTube link or type a topic"})
+            return self.send(400, {"error": "Paste a YouTube or article link, or type a topic"})
         job_id = uuid.uuid4().hex[:12]
         JOBS[job_id] = {"id": job_id, "status": "running", "message": "Starting…", "ids": [], "collections": [],
                         "title": None, "total": 0, "done": 0}
@@ -998,7 +1053,7 @@ def main():
     threading.Thread(target=auto_daily, args=(args.model,), daemon=True).start()
     server = ThreadingHTTPServer(("0.0.0.0" if args.lan else "127.0.0.1", args.port), Handler)
     url = f"http://127.0.0.1:{args.port}"
-    print(f"YT Notes running at {url}  (Ctrl+C to stop)")
+    print(f"EasyNotes running at {url}  (Ctrl+C to stop)")
     if args.lan:
         print(f"On your phone (same Wi-Fi): http://{lan_ip()}:{args.port}")
     if not args.no_open:

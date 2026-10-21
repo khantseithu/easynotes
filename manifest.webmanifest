@@ -1,6 +1,6 @@
 {
-  "name": "YT Notes",
-  "short_name": "YT Notes",
+  "name": "EasyNotes",
+  "short_name": "EasyNotes",
   "description": "Read YouTube videos instead of watching them.",
   "start_url": "/",
   "display": "standalone",

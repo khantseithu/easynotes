@@ -10,7 +10,7 @@ One person (the owner) learning business and product topics from YouTube without
 
 ## Product Purpose
 
-YT Notes turns a YouTube link, or a topic, into notes good enough to replace watching: TL;DR, key ideas with timestamps, frameworks, quotes, action items and a glossary of jargon, plus a locally generated Kokoro audio version. Success is reading a one-hour talk in five minutes and trusting that nothing important was missed.
+EasyNotes turns a YouTube link, or a topic, into notes good enough to replace watching: TL;DR, key ideas with timestamps, frameworks, quotes, action items and a glossary of jargon, plus a locally generated Kokoro audio version. Success is reading a one-hour talk in five minutes and trusting that nothing important was missed.
 
 ## Brand Personality
 

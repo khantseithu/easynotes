@@ -1,8 +1,8 @@
-# YT Notes for Chrome
+# EasyNotes for Chrome
 
-The extension shows your YT Notes next to a YouTube video in Chrome. It opens in the Chrome side panel and follows the video in the current tab.
+The extension shows your EasyNotes next to a YouTube video in Chrome. It opens in the Chrome side panel and follows the video in the current tab.
 
-The extension uses the YT Notes server on your Mac. It does not write notes itself, so the server must be running.
+The extension uses the EasyNotes server on your Mac. It does not write notes itself, so the server must be running.
 
 ## What it does
 
@@ -12,7 +12,7 @@ The extension uses the YT Notes server on your Mac. It does not write notes itse
 - Select Listen to record and play the audio version, as in the app.
 - Glossary terms, action items and the voice setting work as they do in the app.
 - Select the Library button to see all your notes, or to make notes from a link or a topic.
-- Right-click a YouTube link, or a YouTube page, and select Make notes with YT Notes.
+- Right-click a YouTube link, or a YouTube page, and select Make notes with EasyNotes.
 - The toolbar icon shows a check mark on videos that already have notes.
 
 ## Install
@@ -20,9 +20,9 @@ The extension uses the YT Notes server on your Mac. It does not write notes itse
 1. Start the server: `python3 ytnotes.py --no-open`.
 2. In Chrome, go to `chrome://extensions` and turn on Developer mode.
 3. Select Load unpacked and select this `extension` folder.
-4. Pin YT Notes to the toolbar. Open a YouTube video and select the YT Notes icon, or press Alt+Shift+N.
+4. Pin EasyNotes to the toolbar. Open a YouTube video and select the EasyNotes icon, or press Alt+Shift+N.
 
-After you change a file in this folder, select the reload button for YT Notes on `chrome://extensions`.
+After you change a file in this folder, select the reload button for EasyNotes on `chrome://extensions`.
 
 ## Settings
 
