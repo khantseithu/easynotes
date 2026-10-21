@@ -115,9 +115,25 @@ svg { display: block; flex: none; }
 .filter.on { display: block; }
 .filter input { width: 100%; padding: 7px 10px; border-radius: 9px; border: 1px solid var(--line); background: transparent; font-size: 13.5px; outline: none; }
 .filter input:focus { border-color: var(--accent); }
-.list { list-style: none; margin: 0; padding: 0 8px 16px; overflow-y: auto; flex: 1; overscroll-behavior: contain; }
+.list { list-style: none; margin: 0; padding: 0 8px 16px; overflow-y: auto; flex: 1; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in oklch, var(--muted) 58%, transparent) transparent; }
+@supports selector(::-webkit-scrollbar) {
+  .list { scrollbar-width: auto; scrollbar-color: auto; }
+  .list::-webkit-scrollbar { width: 7px; }
+  .list::-webkit-scrollbar-track { background: transparent; }
+  .list::-webkit-scrollbar-thumb { background: color-mix(in oklch, var(--muted) 58%, transparent); border-radius: 99px; }
+  .list::-webkit-scrollbar-thumb:hover { background: color-mix(in oklch, var(--accent) 70%, var(--muted)); }
+  .list::-webkit-scrollbar-button, .list::-webkit-scrollbar-corner { display: none; }
+}
 .item { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 8px; border-radius: 10px; margin-bottom: 1px; }
 .folder-row { position: relative; display: flex; align-items: stretch; padding-left: 28px; }
+.channel-row { position: relative; display: flex; align-items: center; gap: 8px; padding: 10px 10px 6px; color: var(--muted); }
+.channel-toggle { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; padding: 0; background: none; color: inherit; text-align: left; }
+.channel-toggle:hover { color: var(--text); }
+.channel-toggle:disabled { cursor: default; }
+.channel-toggle span:first-child { display: inline-block; transition: transform .15s; }
+.channel-toggle[aria-expanded="true"] span:first-child { transform: rotate(90deg); }
+.channel-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.channel-count { margin-left: auto; font-size: 11px; color: var(--faint); }
 .sort-row { display: flex; align-items: stretch; }
 .sort-row > .item { width: auto; flex: 1; min-width: 0; }
 .sort-handle { width: 22px; flex: none; border: 0; border-radius: 8px; padding: 0; background: transparent; color: var(--faint); cursor: grab; font-size: 16px; touch-action: none; }
@@ -142,6 +158,8 @@ svg { display: block; flex: none; }
 }
 @media (hover: none), (pointer: coarse) {
   .folder-toggle { height: 44px; }
+  .channel-row { padding-top: 4px; padding-bottom: 4px; }
+  .channel-toggle { min-height: 44px; }
   .folder-actions .sort-handle { width: 44px; height: 44px; }
   .folder-actions { bottom: 8px; }
   .folder-meta { min-height: 44px; align-items: center; padding-right: 52px; }
@@ -477,7 +495,7 @@ const ICON = {
 const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
 const EXAMPLES = ["saas distribution", "founder-led sales", "pricing strategy", "product-led growth"];
 
-const state = { notes: [], collections: [], voices: [], current: null, note: null, jobs: [], minutes: store.get("minutes", 60), q: "", playing: null, expandedFolders: store.get("expandedFolders", {}), folderOrder: store.get("folderOrder", []), noteOrder: store.get("noteOrder", []), pinnedItems: store.get("pinnedItems", []) };
+const state = { notes: [], collections: [], voices: [], current: null, note: null, jobs: [], minutes: store.get("minutes", 60), q: "", playing: null, expandedFolders: store.get("expandedFolders", {}), expandedChannels: store.get("expandedChannels", {}), folderOrder: store.get("folderOrder", []), noteOrder: store.get("noteOrder", []), pinnedItems: store.get("pinnedItems", []) };
 
 function applyTheme() {
   const t = store.get("theme", "system");
@@ -519,17 +537,28 @@ $("#q").addEventListener("input", e => { state.q = e.target.value.toLowerCase();
 function renderList() {
   const pinKey = (kind, id) => `${kind}:${id}`;
   const isPinned = (kind, id) => state.pinnedItems.includes(pinKey(kind, id));
-  const ordered = (items, key, kind) => {
+  const timestamp = item => Date.parse(item.created || "") || 0;
+  const ordered = (items, key, kind, date = timestamp) => {
     const order = state[key], rank = new Map(order.map((id, i) => [id, i]));
-    return [...items].sort((a, b) => Number(isPinned(kind, b.id)) - Number(isPinned(kind, a.id)) || (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+    return [...items].sort((a, b) => Number(isPinned(kind, b.id)) - Number(isPinned(kind, a.id)) || (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER) || date(b) - date(a));
   };
-  const match = x => !state.q || (x.title + " " + x.channel).toLowerCase().includes(state.q);
+  const match = x => !state.q || (x.title + " " + (x.channel || "")).toLowerCase().includes(state.q);
   const playlistNoteIds = new Set(state.collections.filter(c => c.kind === "playlist").flatMap(c => (c.videos || []).map(v => v.id)));
-  const notes = ordered(state.notes.filter(n => !playlistNoteIds.has(n.id) && match(n)), "noteOrder", "note");
-  const cols = ordered(state.collections, "folderOrder", "folder").map(c => {
+  const notes = ordered(state.notes.filter(n => !playlistNoteIds.has(n.id)), "noteOrder", "note");
+  const noteById = new Map(state.notes.map(n => [n.id, n]));
+  const collectionDate = c => Math.max(timestamp(c), ...(c.videos || []).map(v => timestamp(noteById.get(v.id) || {})));
+  const cols = ordered(state.collections, "folderOrder", "folder", collectionDate).map(c => {
     const children = (c.videos || []).filter(v => v.read_mins && (!state.q || (v.title + " " + (v.channel || "")).toLowerCase().includes(state.q)));
-    return { ...c, children, matches: match(c) || children.length > 0 };
-  }).filter(c => c.matches);
+    return { ...c, children, matches: match(c) || children.length > 0, channelName: (c.channel || "").trim() || (c.kind === "topic" ? "Topics" : "Other") };
+  });
+  const channelName = n => (n.channel || "").trim() || "Other";
+  const channels = new Map();
+  const addToChannel = (name, type, item) => {
+    if (!channels.has(name)) channels.set(name, { name, notes: [], collections: [] });
+    channels.get(name)[type].push(item);
+  };
+  cols.forEach(c => { if (c.matches) addToChannel(c.channelName, "collections", c); });
+  notes.forEach(n => { if (match(n)) addToChannel(channelName(n), "notes", n); });
   const saved = state.notes.reduce((a, n) => a + Math.max(0, n.secs - n.read_mins * 60), 0);
   $("#lib-stats").textContent = state.notes.length ? `${state.notes.length} notes${saved ? ` · ${dur(saved)} saved` : ""}` : "";
   $("#filter").classList.toggle("on", state.notes.length > 5 || state.collections.length > 0);
@@ -540,11 +569,12 @@ function renderList() {
         ${j.status === "error" ? `<button class="x" data-dismiss="${j.id}">Dismiss</button>` : ""}</div>
       ${j.total > 1 && j.status !== "error" ? `<div class="bar"><i style="width:${Math.round(100 * (j.done || 0) / j.total)}%"></i></div>` : ""}
     </li>`).join("");
-  const colItems = cols.map(c => {
-    const expanded = Object.hasOwn(state.expandedFolders, c.id) ? !!state.expandedFolders[c.id] : (!!state.q && !match(c));
+  const renderCollection = (c, channel) => {
+    const forcedOpen = !!state.q && c.children.length > 0;
+    const expanded = forcedOpen || (Object.hasOwn(state.expandedFolders, c.id) ? !!state.expandedFolders[c.id] : false);
     return `<li>
-      <div class="folder-row sort-row" data-sortable="folder" data-sort-id="${esc(c.id)}">
-        <button class="folder-toggle" data-folder="${esc(c.id)}" aria-label="${expanded ? "Collapse" : "Expand"} ${esc(c.title)}" aria-expanded="${expanded}"><span>›</span></button>
+      <div class="folder-row sort-row" data-sortable="folder" data-sort-id="${esc(c.id)}" data-sort-group="${esc(channel)}">
+        <button class="folder-toggle" data-folder="${esc(c.id)}" aria-label="${forcedOpen ? `${esc(c.title)}, expanded while filtering` : `${expanded ? "Collapse" : "Expand"} ${esc(c.title)}`}" aria-expanded="${expanded}" ${forcedOpen ? 'disabled title="Clear search to collapse"' : ""}><span>›</span></button>
         <button class="item" data-col="${esc(c.id)}" aria-current="${state.current === "c:" + c.id}">
           <div class="t">${esc(c.title)}</div>
           <div class="m folder-meta"><span>${c.ready < c.count ? `${c.ready} of ${c.count} notes` : `${c.count} videos`}</span>${
@@ -556,14 +586,23 @@ function renderList() {
       </div>
       ${expanded && c.children.length ? `<ul class="folder-children">${c.children.map(v => `<li><button class="item" data-id="${esc(v.id)}" aria-current="${v.id === state.current}"><div class="t">${esc(v.title)}</div><div class="m">${esc(v.channel || "")}<span class="dot">${v.read_mins} min read</span></div></button></li>`).join("")}</ul>` : ""}
     </li>`;
-  }).join("");
-  const items = notes.map(n => `
-    <li class="sort-row" data-sortable="note" data-sort-id="${esc(n.id)}"><button class="sort-handle" data-drag-handle aria-label="Reorder ${esc(n.title)}. Use arrow keys to move" title="Drag or use ↑/↓ to reorder" draggable="true" ${state.q ? "hidden" : ""}>⠿</button><button class="item" data-id="${esc(n.id)}" aria-current="${n.id === state.current}">
+  };
+  const renderNote = (n, channel) => `
+    <li class="sort-row" data-sortable="note" data-sort-id="${esc(n.id)}" data-sort-group="${esc(channel)}"><button class="sort-handle" data-drag-handle aria-label="Reorder ${esc(n.title)}. Use arrow keys to move" title="Drag or use ↑/↓ to reorder" draggable="true" ${state.q ? "hidden" : ""}>⠿</button><button class="item" data-id="${esc(n.id)}" aria-current="${n.id === state.current}">
       <div class="t">${esc(n.title)}</div>
       <div class="m"><span>${esc(n.channel)}</span><span class="dot">${n.read_mins} min read</span>${
-        state.playing === n.id ? `<span class="dot playing">Playing</span>` : n.audio ? `<span class="dot">Audio</span>` : ""}</div>
-    </button></li>`).join("");
-  const sections = colItems ? `<li class="lib-label">Playlists and topics</li>${colItems}${items ? `<li class="lib-label">Notes</li>${items}` : ""}` : items;
+        state.playing === n.id ? `<span class="dot playing">Playing</span>` : n.audio && n.language !== "my" ? `<span class="dot">Audio</span>` : ""}</div>
+    </button></li>`;
+  const channelDate = channel => Math.max(0, ...channel.notes.map(timestamp), ...channel.collections.map(collectionDate), ...state.notes.filter(n => channelName(n) === channel.name).map(timestamp));
+  const sections = [...channels.values()].sort((a, b) => channelDate(b) - channelDate(a) || a.name.localeCompare(b.name)).map(channel => {
+    const key = channel.name;
+    const forcedOpen = !!state.q;
+    const expanded = forcedOpen || !Object.hasOwn(state.expandedChannels, key) || !!state.expandedChannels[key];
+    const count = channel.notes.length + channel.collections.length;
+    const collectionItems = channel.collections.map(c => renderCollection(c, key)).join("");
+    const noteItems = channel.notes.map(n => renderNote(n, key)).join("");
+    return `<li><div class="channel-row"><button class="channel-toggle" data-channel="${esc(key)}" aria-label="${forcedOpen ? `${esc(key)}, expanded while filtering` : `${expanded ? "Collapse" : "Expand"} ${esc(key)}`}" aria-expanded="${expanded}" ${forcedOpen ? 'disabled title="Clear search to collapse"' : ""}><span>›</span><span class="channel-name">${esc(key)}</span><span class="channel-count">${count}</span></button></div>${expanded ? `<ul class="folder-children">${collectionItems}${noteItems}</ul>` : ""}</li>`;
+  }).join("");
   $("#list").innerHTML = jobs + (sections || (state.jobs.length ? "" : `<li class="empty-lib">${state.q ? "No notes match." : "Notes you make will appear here."}</li>`));
   todayMeta();
 }
@@ -583,6 +622,15 @@ $("#list").onclick = e => {
   if (d) { state.jobs = state.jobs.filter(j => j.id !== d.dataset.dismiss); return renderList(); }
   const c = e.target.closest("[data-col]");
   if (c) { openCollection(c.dataset.col); side(false); return; }
+  const ch = e.target.closest("[data-channel]");
+  if (ch) {
+    const key = ch.dataset.channel;
+    state.expandedChannels[key] = ch.getAttribute("aria-expanded") !== "true";
+    store.set("expandedChannels", state.expandedChannels);
+    renderList();
+    $(`#list [data-channel="${CSS.escape(key)}"]`).focus();
+    return;
+  }
   const f = e.target.closest("[data-folder]");
   if (f) {
     const id = f.dataset.folder;
@@ -600,15 +648,21 @@ const reorderRows = (kind, fromId, toId, after) => {
   if (fromId === toId) return;
   if (state.pinnedItems.includes(`${kind}:${fromId}`) !== state.pinnedItems.includes(`${kind}:${toId}`)) return;
   const key = kind === "folder" ? "folderOrder" : "noteOrder";
-  const rows = [...document.querySelectorAll(`[data-sortable="${kind}"]`)];
+  const fromRow = document.querySelector(`[data-sortable="${kind}"][data-sort-id="${CSS.escape(fromId)}"]`);
+  const toRow = document.querySelector(`[data-sortable="${kind}"][data-sort-id="${CSS.escape(toId)}"]`);
+  if (!fromRow || !toRow || fromRow.dataset.sortGroup !== toRow.dataset.sortGroup) return;
+  const group = fromRow.dataset.sortGroup;
+  const rows = [...document.querySelectorAll(`[data-sortable="${kind}"]`)].filter(row => row.dataset.sortGroup === group && state.pinnedItems.includes(`${kind}:${row.dataset.sortId}`) === state.pinnedItems.includes(`${kind}:${fromId}`));
   const ids = rows.map(row => row.dataset.sortId);
+  if (!ids.includes(fromId) || !ids.includes(toId)) return;
   const from = ids.indexOf(fromId), target = ids.indexOf(toId);
   if (from < 0 || target < 0) return;
   ids.splice(from, 1);
   let at = ids.indexOf(toId) + (after ? 1 : 0);
   ids.splice(at, 0, fromId);
-  state[key] = ids;
-  store.set(key, ids);
+  const groupIds = new Set(ids);
+  state[key] = [...state[key].filter(id => !groupIds.has(id)), ...ids];
+  store.set(key, state[key]);
   renderList();
 };
 $("#list").addEventListener("keydown", e => {
@@ -617,7 +671,7 @@ $("#list").addEventListener("keydown", e => {
   e.preventDefault();
   const row = handle.closest("[data-sortable]");
   const pinned = state.pinnedItems.includes(`${row.dataset.sortable}:${row.dataset.sortId}`);
-  const group = [...document.querySelectorAll(`[data-sortable="${row.dataset.sortable}"]`)].filter(item => state.pinnedItems.includes(`${item.dataset.sortable}:${item.dataset.sortId}`) === pinned);
+  const group = [...document.querySelectorAll(`[data-sortable="${row.dataset.sortable}"]`)].filter(item => item.dataset.sortGroup === row.dataset.sortGroup && state.pinnedItems.includes(`${item.dataset.sortable}:${item.dataset.sortId}`) === pinned);
   const index = group.indexOf(row), next = group[index + (e.key === "ArrowUp" ? -1 : 1)];
   if (!next) return;
   reorderRows(row.dataset.sortable, row.dataset.sortId, next.dataset.sortId, e.key === "ArrowDown");
@@ -634,7 +688,7 @@ $("#list").addEventListener("dragstart", e => {
 $("#list").addEventListener("dragover", e => {
   const row = e.target.closest("[data-sortable]");
   const dragged = document.querySelector(".sort-row.dragging");
-  if (!row || !dragged || row.dataset.sortable !== dragged.dataset.sortable || row === dragged) { clearDropMarks(); return; }
+  if (!row || !dragged || row.dataset.sortable !== dragged.dataset.sortable || row.dataset.sortGroup !== dragged.dataset.sortGroup || row === dragged) { clearDropMarks(); return; }
   if (state.q) { clearDropMarks(); e.dataTransfer.dropEffect = "none"; return; }
   if (state.pinnedItems.includes(`${row.dataset.sortable}:${row.dataset.sortId}`) !== state.pinnedItems.includes(`${dragged.dataset.sortable}:${dragged.dataset.sortId}`)) { clearDropMarks(); e.dataTransfer.dropEffect = "none"; return; }
   e.preventDefault();
@@ -645,7 +699,7 @@ $("#list").addEventListener("dragover", e => {
 $("#list").addEventListener("drop", e => {
   const row = e.target.closest("[data-sortable]");
   const dragged = document.querySelector(".sort-row.dragging");
-  if (state.q || !row || !dragged || row.dataset.sortable !== dragged.dataset.sortable || row === dragged) return;
+  if (state.q || !row || !dragged || row.dataset.sortable !== dragged.dataset.sortable || row.dataset.sortGroup !== dragged.dataset.sortGroup || row === dragged) return;
   if (state.pinnedItems.includes(`${row.dataset.sortable}:${row.dataset.sortId}`) !== state.pinnedItems.includes(`${dragged.dataset.sortable}:${dragged.dataset.sortId}`)) return;
   e.preventDefault();
   const after = e.clientY >= row.getBoundingClientRect().top + row.offsetHeight / 2;
@@ -736,6 +790,7 @@ $("#view").addEventListener("click", e => {
 });
 
 function enhance(root, n) {
+  if (n.language === "my") root.lang = "my";
   root.querySelectorAll("h3 a").forEach(a => {
     if (/^\d{1,2}(:\d{2}){1,2}$/.test(a.textContent.trim())) { a.className = "ts"; a.setAttribute("aria-label", `Watch from ${a.textContent}`); }
   });
@@ -757,6 +812,7 @@ function enhance(root, n) {
 
   const gh = [...root.querySelectorAll("h2")].find(h => /glossary/i.test(h.textContent));
   const terms = [];
+  const termIds = new Set();
   if (gh && gh.nextElementSibling?.tagName === "UL") {
     const dl = document.createElement("dl");
     dl.className = "glossary";
@@ -766,7 +822,10 @@ function enhance(root, n) {
       const term = strong.textContent.trim();
       const rest = li.innerHTML.slice(li.innerHTML.indexOf("</strong>") + 9).replace(/^\s*/, "");
       const m = rest.match(/^\(([^)]*)\)\s*:?\s*([\s\S]*)$/) || [null, "", rest.replace(/^:\s*/, "")];
-      const id = "g-" + term.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      const baseId = "g-" + term.toLowerCase().replace(/[^\p{L}\p{N}\p{M}]+/gu, "-").replace(/^-|-$/g, "");
+      let id = baseId;
+      for (let suffix = 2; termIds.has(id); suffix++) id = `${baseId}-${suffix}`;
+      termIds.add(id);
       const def = m[2].replace(/^:\s*/, "");
       dl.insertAdjacentHTML("beforeend", `<dt id="${id}">${esc(term)}</dt><dd>${m[1] ? `<span class="full">${esc(m[1])}.</span> ` : ""}${def}</dd>`);
       const tmp = document.createElement("div"); tmp.innerHTML = def;
@@ -774,6 +833,15 @@ function enhance(root, n) {
     });
     gh.nextElementSibling.replaceWith(dl);
     linkTerms(root, gh, terms);
+  }
+  if (n.language === "my") {
+    const labels = {
+      "TL;DR": "အနှစ်ချုပ်", "Key ideas": "အဓိကအချက်များ", Frameworks: "မူဘောင်များ",
+      Quotes: "ကိုးကားချက်များ", "Action items": "လုပ်ဆောင်ရန်များ", Glossary: "ဝေါဟာရများ",
+      Goal: "ရည်ရွယ်ချက်", Prerequisites: "လိုအပ်ချက်များ", Steps: "အဆင့်များ",
+      Gotchas: "သတိပြုရန်များ", Result: "ရလဒ်",
+    };
+    root.querySelectorAll("h2").forEach(h => { h.textContent = labels[h.textContent.trim()] || h.textContent; });
   }
 }
 
@@ -896,26 +964,28 @@ function renderActions(msg, kind, pct) {
   if (!n || !$("#actions")) return;
   if (state.confirmDelete === n.id) return renderConfirm(n);
   const voice = voiceOf();
-  const ready = n.audio && n.audio.voice === voice;
+  const audioSupported = n.language !== "my";
+  const ready = audioSupported && n.audio && n.audio.voice === voice;
   const isPlaying = state.playing === n.id && !audio.paused;
-  const label = msg ? msg : ready ? (isPlaying ? "Pause" : state.playing === n.id ? "Resume" : "Listen") : n.audio ? "Record in this voice" : `Listen · ~${Math.max(1, Math.round(n.read_mins * 1.3))} min`;
+  const label = !audioSupported ? "Burmese audio unavailable" : msg ? msg : ready ? (isPlaying ? "Pause" : state.playing === n.id ? "Resume" : "Listen") : n.audio ? "Record in this voice" : `Listen · ~${Math.max(1, Math.round(n.read_mins * 1.3))} min`;
   $("#actions").innerHTML = `
-    <button class="btn primary" id="listen" ${msg && kind !== "err" ? "disabled" : ""}>
+    <button class="btn primary" id="listen" ${!audioSupported || msg && kind !== "err" ? "disabled" : ""} title="${!audioSupported ? "Burmese audio is not supported yet" : ""}">
       <span class="fill" style="width:${pct || 0}%"></span>${msg && kind !== "err" ? `<span class="spin" style="border-color:oklch(1 0 0 / .3);border-top-color:currentColor"></span>` : isPlaying ? ICON.pause : ICON.headphones}<span>${esc(label)}</span>
     </button>
-    <label class="vh" for="voice">Voice</label>
-    <select class="voice" id="voice">${state.voices.map(v => `<option value="${v.id}" ${v.id === voice ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select>
+    ${audioSupported ? `<label class="vh" for="voice">Voice</label><select class="voice" id="voice">${state.voices.map(v => `<option value="${v.id}" ${v.id === voice ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select>` : ""}
     <a class="btn" href="https://youtu.be/${n.id}" target="_blank" rel="noopener">${ICON.ext}<span>Watch</span></a>
     ${pinButton("note", n.id, n.title)}
     ${kind === "err" ? `<span class="act-msg err">${esc(msg)}</span>` : ""}
     <button class="btn del" id="del" aria-label="Delete notes" title="Delete notes" ${msg && kind !== "err" ? "disabled" : ""}>${ICON.trash}</button>`;
   $("#del").onclick = () => { state.confirmDelete = n.id; renderActions(); $("#del-yes").focus(); };
   if (kind === "err") $("#listen").querySelector("span:last-child").textContent = "Try again";
-  $("#voice").onchange = e => { store.set("voice", e.target.value); renderActions(); };
-  $("#listen").onclick = () => {
-    if (ready) return state.playing === n.id ? togglePlay() : play(n);
-    record(n);
-  };
+  if (audioSupported) {
+    $("#voice").onchange = e => { store.set("voice", e.target.value); renderActions(); };
+    $("#listen").onclick = () => {
+      if (ready) return state.playing === n.id ? togglePlay() : play(n);
+      record(n);
+    };
+  }
 }
 
 function renderConfirm(n, err) {

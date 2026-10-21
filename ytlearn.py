@@ -12,11 +12,15 @@ from datetime import date
 from pathlib import Path
 
 import llm
+import transcript as transcript_utils
 
 UA = {"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US"}
 
 PROMPT = """You are summarizing a YouTube video for someone learning "{topic}" who is short on time.
 Video: "{title}" by {channel}
+
+Write in {language}.
+When writing in Burmese, use Burmese for all explanations and prose. Keep Latin text only for names, technical terms, numbers, and verbatim source text. Do not use unrelated scripts or include drafting or self-review remarks.
 
 From the transcript on stdin, write:
 - One line: what this video is really about.
@@ -137,36 +141,59 @@ def search_safe(query):
         return []
 
 
-def transcript(video_id, workdir, attempts=2):
+def transcript_info(video_id, workdir, attempts=2):
     for _ in range(attempts):
-        text = fetch_transcript(video_id, workdir)
+        text, language = fetch_transcript(video_id, workdir)
         if text:
-            return text
-    return ""
+            return text, language
+    return "", "English"
+
+
+def transcript(video_id, workdir, attempts=2):
+    return transcript_info(video_id, workdir, attempts)[0]
 
 
 def fetch_transcript(video_id, workdir):
+    info = subprocess.run(["yt-dlp", "-j", "--skip-download", "--no-warnings",
+                           f"https://www.youtube.com/watch?v={video_id}"],
+                          capture_output=True, text=True, timeout=120)
+    try:
+        original_language = json.loads(info.stdout).get("language")
+    except json.JSONDecodeError:
+        original_language = None
+    langs, _ = transcript_utils.caption_languages(original_language)
+    language = "Burmese" if (original_language or "").lower().startswith("my") else "English"
     subprocess.run(
-        ["yt-dlp", "--skip-download", "--write-auto-subs", "--write-subs",
-         "--sub-langs", "en.*,en", "--sub-format", "json3", "--quiet", "--no-warnings",
+        ["yt-dlp", "--skip-download", "--write-info-json", "--write-auto-subs", "--write-subs",
+         "--sub-langs", langs, "--sub-format", "json3", "--quiet", "--no-warnings",
          "-o", str(Path(workdir) / "%(id)s"), f"https://www.youtube.com/watch?v={video_id}"],
         capture_output=True, timeout=120,
     )
-    files = sorted(Path(workdir).glob(f"{video_id}*.json3"))
-    if not files:
-        return ""
-    data = json.loads(files[0].read_text())
-    words = "".join(s.get("utf8", "") for e in data.get("events", []) for s in e.get("segs", []))
-    return re.sub(r"\s+", " ", words).strip()
+    files = transcript_utils.order_caption_files(list(Path(workdir).glob(f"{video_id}*.json3")), video_id,
+                                                  original_language)
+    for path in files:
+        try:
+            data = json.loads(path.read_text())
+        except json.JSONDecodeError:
+            continue
+        words = "".join(s.get("utf8", "") for e in data.get("events", []) for s in e.get("segs", []))
+        words = re.sub(r"\s+", " ", words).strip()
+        if words:
+            if path.name[len(video_id) + 1:].startswith("my"):
+                language = "Burmese"
+            return words, language
+    return "", language
 
 
 def summarize(v, topic, model, workdir):
-    text = transcript(v["id"], workdir)
+    text, language = transcript_info(v["id"], workdir)
     if not text:
         return "_No transcript available._"
-    prompt = PROMPT.format(topic=topic, title=v["title"], channel=v["channel"])
+    prompt = PROMPT.format(topic=topic, title=v["title"], channel=v["channel"], language=language)
     try:
-        out = llm.run(prompt, model, text[:80000], timeout=300)
+        source = text[:80000]
+        out = llm.run_burmese(prompt, model, source, source, timeout=300) if language == "Burmese" \
+            else llm.run(prompt, model, source, timeout=300)
         if out.returncode != 0 or not out.stdout.strip():
             return f"_Summary failed: {(out.stderr.strip() or 'no output').splitlines()[-1][:200]}_"
         return out.stdout.strip()
@@ -206,7 +233,8 @@ def main():
     ap.add_argument("--per-channel", type=int, default=1)
     ap.add_argument("--no-summary", action="store_true")
     ap.add_argument("--no-rank", action="store_true", help="skip AI picking, rank by views only")
-    ap.add_argument("--model", default=llm.DEFAULT_MODEL, help="pi provider/model, or a Claude model such as claude-haiku-5-5")
+    ap.add_argument("--model", default=None,
+                    help=f"pi provider/model, or a Claude model such as claude-haiku-5-5 (default: English {llm.DEFAULT_MODEL}, Burmese {llm.BURMESE_MODEL})")
     ap.add_argument("-o", "--out", help="output markdown path")
     args = ap.parse_args()
 
