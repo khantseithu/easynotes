@@ -13,18 +13,6 @@ Each note has these parts:
 - Action items as checkboxes.
 - A glossary that explains each abbreviation and jargon term.
 
-Tutorials get a different structure, so that you can follow along without watching the whole video:
-
-- The goal: what you build or learn.
-- The prerequisites: tools, versions and accounts.
-- Numbered steps, each with a link to its timestamp, a screenshot from the video, and the commands or code that it needs. Select a screenshot to watch that part of the video.
-- Gotchas: the errors and fixes that the presenter mentions.
-- The result, and what to try next.
-- The links from the video description.
-- A glossary.
-
-The app decides the kind of video by itself. To choose the structure yourself, use `--kind tutorial` or `--kind conversation`.
-
 English notes use plain English. The app gives the writing rules of the [simple-english](https://github.com/AminBlg/SimpleEnglish) skill to the model. Sentences are short, verbs are active, and the notes have no filler words.
 
 Burmese videos and articles get Burmese notes. Audio is unavailable for Burmese notes because the current Kokoro voices do not support Burmese.
@@ -118,7 +106,6 @@ You can also use EasyNotes without the browser. Each command saves its result in
 | `python3 ytnotes.py "https://www.youtube.com/playlist?list=PLAYLIST_ID"` | Writes notes for the first 50 videos of a playlist and saves the playlist as a collection. |
 | `python3 ytnotes.py "saas distribution" -t 60` | Writes notes for the best videos on a topic, about 60 minutes of video in total. |
 | `python3 ytnotes.py "https://youtu.be/VIDEO_ID" --audio --voice bm_george` | Writes notes and records the audio in the voice that you select. |
-| `python3 ytnotes.py "https://youtu.be/VIDEO_ID" --kind tutorial` | Writes notes with the tutorial structure. The choices are `auto` (the default), `conversation`, `talk`, and `tutorial`. |
 | `python3 ytnotes.py --daily` | Makes today's watch list from your channels and prints it. |
 | `python3 ytnotes.py --add-glossary` | Adds a glossary to old notes that do not have one. |
 | `python3 ytnotes.py --model openai-codex/gpt-6-luna` | Uses a different model. See the Choose a model section. |
@@ -148,11 +135,8 @@ The app makes a note in these steps:
 
 1. yt-dlp gets the title, the channel, the length, the chapters, the description, and the captions of the video. For Burmese originals, it prefers Burmese captions; otherwise it prefers English and falls back to Burmese.
 2. If YouTube blocks the caption download, youtube-transcript-api gets the captions in a different way, in the same language.
-3. The model reads the title, the description, and the start of the transcript, and decides if the video is a conversation, a talk, or a tutorial.
-4. For a tutorial, `context.py` reads the GitHub repos, gists, and docs pages that the description links to. From a repo, it reads the README, the file list, and a few key files. The model then uses the real code instead of guessing it from speech.
-5. agy, pi, or Claude Code writes the notes from the chapters, the linked sources, and the transcript. English notes follow the rules in `skills/simple-english/SKILL.md`. Burmese notes and glossary definitions use Burmese.
-6. For a tutorial, yt-dlp downloads the video at 720p or lower, and ffmpeg takes one frame for each step. The frames are in `notes/frames/`.
-7. For audio, `tts.py` changes the notes into a spoken script and Kokoro records it. ffmpeg then compresses the recording to an `.m4a` file.
+3. agy, pi, or Claude Code writes the notes from the chapters and the transcript. English notes follow the rules in `skills/simple-english/SKILL.md`. Burmese notes and glossary definitions use Burmese.
+4. For audio, `tts.py` changes the notes into a spoken script and Kokoro records it. ffmpeg then compresses the recording to an `.m4a` file.
 
 Before saving Burmese output, the app checks for unrelated foreign scripts and editing remarks. It allows foreign names that appear in the source, and Latin technical terms. If the check fails, it asks the model to repair the output once. If that repair still fails, the app reports an error instead of saving the text.
 
@@ -167,8 +151,7 @@ The project has these files and folders:
 | `tts.py` | The script that records audio with Kokoro. |
 | `ytlearn.py` | The video search and the playlist builder. |
 | `daily.py` | The daily watch list: your channels, their RSS feeds, and the picks. |
-| `ROADMAP.md` | Ideas for improving tutorial notes. |
-| `context.py` | The code that gets chapters and reads the repos and docs that a video links to. |
+| `context.py` | The code that gets chapters and reads article pages. |
 | `llm.py` | The code that sends prompts to agy, pi, or Claude Code. |
 | `skills/simple-english/` | A copy of the simple-english skill, with its license and source. |
 | `assets/` | The app icon in SVG and PNG. |
