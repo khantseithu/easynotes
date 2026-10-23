@@ -938,6 +938,8 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             c = next((c for c in load_collections() if c["id"] == m.group(1)), None)
             return self.send(200, collection_view(c)) if c else self.send(404, {"error": "not found"})
+        if self.path == "/api/jobs":
+            return self.send(200, [j for j in list(JOBS.values()) if j.get("input") and j["status"] == "running"])
         m = re.fullmatch(r"/api/jobs/(\w+)", self.path)
         if m and m.group(1) in JOBS:
             return self.send(200, JOBS[m.group(1)])
@@ -970,7 +972,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(400, {"error": "Paste a YouTube or article link, or type a topic"})
         job_id = uuid.uuid4().hex[:12]
         JOBS[job_id] = {"id": job_id, "status": "running", "message": "Starting…", "ids": [], "collections": [],
-                        "title": None, "total": 0, "done": 0}
+                        "title": None, "total": 0, "done": 0, "input": text, "label": body.get("label") or text,
+                        "vid": body.get("vid")}
         threading.Thread(target=run_job, args=(JOBS[job_id], text, int(body.get("minutes") or 60), self.model,
                                                body.get("kind")), daemon=True).start()
         self.send(202, JOBS[job_id])

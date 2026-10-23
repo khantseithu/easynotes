@@ -1110,13 +1110,25 @@ $("#composer").addEventListener("submit", e => {
 });
 
 // stay: keep the current view open when the notes are ready, for Make notes on the Today list.
-async function startJob(input, { label, stay } = {}) {
-  const job = { id: Math.random().toString(36).slice(2), label: label || input, message: "Starting…", status: "running" };
+async function startJob(input, { label, stay, vid } = {}) {
+  const job = { id: Math.random().toString(36).slice(2), label: label || input, message: "Starting…", status: "running", vid };
   state.jobs.unshift(job);
   renderList();
+  return runJob(job, () => api("/api/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input, minutes: state.minutes, label, vid }) }), stay);
+}
+async function resumeJobs() {
+  const running = await api("/api/jobs");
+  for (const j of running) {
+    const job = { id: j.id, label: j.label, message: j.message, status: "running", vid: j.vid, title: j.title, total: j.total, done: j.done, opened: true };
+    state.jobs.push(job);
+    runJob(job, async () => j, true);
+  }
+  if (running.length) renderList();
+}
+async function runJob(job, first, stay) {
   try {
-    let j = await api("/api/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input, minutes: state.minutes }) });
-    let shown = 0;
+    let j = await first();
+    let shown = j.ids?.length || 0;
     while (j.status === "running") {
       await new Promise(r => setTimeout(r, 1500));
       j = await api(`/api/jobs/${j.id}`);
@@ -1252,9 +1264,7 @@ $("#view").addEventListener("click", async e => {
   const make = e.target.closest("[data-make]"), un = e.target.closest("[data-unsrc]");
   if (make) {
     make.outerHTML = `<div class="st"><div class="spin"></div>Writing notes…</div>`;
-    const run = startJob(`https://youtu.be/${make.dataset.make}`, { label: make.dataset.title, stay: true });
-    state.jobs[0].vid = make.dataset.make;
-    await run;
+    await startJob(`https://youtu.be/${make.dataset.make}`, { label: make.dataset.title, stay: true, vid: make.dataset.make });
     if (state.current === "today") openToday(true);
   } else if (un) sourcesCall({ url: `/api/sources/${un.dataset.unsrc}`, method: "DELETE" }, "Removing…");
   else if (e.target.closest("#src-seed")) sourcesCall({ body: { seed: true } }, "Finding the channels of your notes…");
@@ -1274,7 +1284,7 @@ applyTheme();
 renderSeg();
 $("#p-speed").textContent = `${store.get("speed", 1)}×`;
 syncPlayer();
-Promise.all([api("/api/voices").then(v => { state.voices = v; }), loadNotes(), loadCollections(), loadDaily().catch(() => null)]).then(() => {
+Promise.all([api("/api/voices").then(v => { state.voices = v; }), loadNotes(), loadCollections(), loadDaily().catch(() => null), resumeJobs().catch(() => null)]).then(() => {
   if (route()) return;
   if (state.daily?.sources.length) openToday();
   else if (state.notes.length) openNote(state.notes[0].id);
