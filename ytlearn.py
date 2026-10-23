@@ -234,7 +234,7 @@ def main():
     ap.add_argument("--no-summary", action="store_true")
     ap.add_argument("--no-rank", action="store_true", help="skip AI picking, rank by views only")
     ap.add_argument("--model", default=None,
-                    help=f"pi provider/model, or a Claude model such as claude-haiku-5-5 (default: English {llm.DEFAULT_MODEL}, Burmese {llm.BURMESE_MODEL})")
+                    help=f"Gemini model (agy), pi provider/model, or a Claude model such as claude-haiku-5-5 (default: English {llm.DEFAULT_MODEL}, Burmese {llm.BURMESE_MODEL})")
     ap.add_argument("-o", "--out", help="output markdown path")
     args = ap.parse_args()
 

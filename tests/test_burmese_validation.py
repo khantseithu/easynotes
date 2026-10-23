@@ -1,3 +1,4 @@
+import json
 import subprocess
 import unittest
 from unittest.mock import patch
@@ -6,19 +7,24 @@ import llm
 import transcript
 
 
+def agy(text):
+    result = {"event": "result", "result": {"status": "SUCCESS", "response": text}}
+    return subprocess.CompletedProcess([], 0, stdout=json.dumps(result), stderr="")
+
+
 class BurmeseValidationTests(unittest.TestCase):
     @patch("llm.subprocess.run")
-    def test_generic_run_without_model_uses_luna(self, process_run):
+    def test_generic_run_without_model_uses_default(self, process_run):
         process_run.return_value = subprocess.CompletedProcess([], 0, stdout="ok", stderr="")
         llm.run("prompt", None)
         self.assertEqual(process_run.call_args.args[0][process_run.call_args.args[0].index("--model") + 1],
                          llm.DEFAULT_MODEL)
 
     @patch("llm.subprocess.run")
-    def test_burmese_default_uses_sol_for_initial_and_repair(self, process_run):
+    def test_burmese_default_uses_burmese_model_for_initial_and_repair(self, process_run):
         process_run.side_effect = [
-            subprocess.CompletedProcess([], 0, stdout="မြန်မာ текст", stderr=""),
-            subprocess.CompletedProcess([], 0, stdout="မြန်မာ Python API", stderr=""),
+            agy("မြန်မာ текст"),
+            agy("မြန်မာ Python API"),
         ]
         result = llm.run_burmese("Write notes", None, "source", "source")
         self.assertEqual(result.stdout, "မြန်မာ Python API")
@@ -27,16 +33,16 @@ class BurmeseValidationTests(unittest.TestCase):
             self.assertEqual(call.args[0][call.args[0].index("--model") + 1], llm.BURMESE_MODEL)
 
     @patch("llm.subprocess.run")
-    def test_explicit_luna_is_kept_for_burmese(self, process_run):
-        process_run.return_value = subprocess.CompletedProcess([], 0, stdout="မြန်မာ Python API", stderr="")
+    def test_explicit_default_is_kept_for_burmese(self, process_run):
+        process_run.return_value = agy("မြန်မာ Python API")
         llm.run_burmese("Write notes", llm.DEFAULT_MODEL, "source", "source")
         self.assertEqual(process_run.call_args.args[0][process_run.call_args.args[0].index("--model") + 1],
                          llm.DEFAULT_MODEL)
 
     def test_language_defaults_and_explicit_model_override(self):
-        self.assertEqual(llm.model_for_language("en"), "openai-codex/gpt-6-luna")
-        self.assertEqual(llm.model_for_language("my"), "openai-codex/gpt-6.1-sol")
-        self.assertEqual(llm.model_for_language("Burmese"), "openai-codex/gpt-6.1-sol")
+        self.assertEqual(llm.model_for_language("en"), "gemini-3.8-flash")
+        self.assertEqual(llm.model_for_language("my"), "gemini-3.8-flash-high")
+        self.assertEqual(llm.model_for_language("Burmese"), "gemini-3.8-flash-high")
         self.assertEqual(llm.model_for_language("my", "openai-codex/gpt-6-luna"),
                          "openai-codex/gpt-6-luna")
 

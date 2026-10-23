@@ -1,12 +1,17 @@
+import json
 import subprocess
 import tempfile
 
 import transcript
 
-DEFAULT_MODEL = "openai-codex/gpt-6-luna"
-BURMESE_MODEL = "openai-codex/gpt-6.1-sol"
+DEFAULT_MODEL = "gemini-3.8-flash"
+BURMESE_MODEL = "gemini-3.8-flash-high"
 CLAUDE_ALIASES = {"haiku", "sonnet", "opus", "fable"}
 PI_FLAGS = ["--no-tools", "--no-session", "-nc", "-ns", "-np", "-ne", "-na"]
+AGY_FLAGS = ["--input-format", "stream-json", "--output-format", "stream-json", "--disable-slash-commands", "-p="]
+AGY_NOTE = ("Answer from this message alone. Do not use any tools, commands, files, or web pages. "
+            "Everything the instructions call stdin is included at the end of this message, after the line \"--- stdin ---\". "
+            "Reply with only the requested output.")
 
 
 def model_for_language(language, model=None):
@@ -15,7 +20,27 @@ def model_for_language(language, model=None):
     return BURMESE_MODEL if language in ("my", "Burmese") else DEFAULT_MODEL
 
 
+def agy_model(model):
+    if model.startswith("agy:"):
+        return model.removeprefix("agy:")
+    if "/" not in model and model.startswith("gemini-"):
+        return model
+    return None
+
+
+def agy_result(out):
+    events = [json.loads(line) for line in out.stdout.splitlines() if line.startswith("{")]
+    results = [e["result"] for e in events if e.get("event") == "result"]
+    result = results[-1] if results else {}
+    ok = out.returncode == 0 and result.get("status") == "SUCCESS"
+    error = result.get("error") or out.stderr
+    return subprocess.CompletedProcess(out.args, 0 if ok else out.returncode or 1,
+                                       result.get("response", "") if ok else "", "" if ok else error)
+
+
 def command(prompt, model):
+    if agy_model(model):
+        return ["agy", "--model", agy_model(model), *AGY_FLAGS]
     if model.startswith("claude:"):
         return ["claude", "-p", prompt, "--model", model.removeprefix("claude:")]
     if model.startswith("pi:"):
@@ -28,6 +53,11 @@ def command(prompt, model):
 def run(prompt, model, input_text="", timeout=900):
     model = model or DEFAULT_MODEL
     with tempfile.TemporaryDirectory() as cwd:
+        if agy_model(model):
+            content = AGY_NOTE + "\n\n" + prompt + ("\n\n--- stdin ---\n" + input_text if input_text else "")
+            message = json.dumps({"event": "user", "message": {"content": content}})
+            return agy_result(subprocess.run(command(prompt, model), input=message, capture_output=True,
+                                             text=True, timeout=timeout, cwd=cwd))
         return subprocess.run(command(prompt, model), input=input_text, capture_output=True,
                               text=True, timeout=timeout, cwd=cwd)
 
