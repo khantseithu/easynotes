@@ -1005,7 +1005,7 @@ def main():
     ap.add_argument("input", nargs="*", help="YouTube links, playlist links, or a topic; omit to open the app")
     ap.add_argument("-t", "--time", type=int, default=60, help="minutes of video to cover for a topic")
     ap.add_argument("--model", default=None,
-                    help=f"pi model as provider/model (default: English {DEFAULT_MODEL}, Burmese {llm.BURMESE_MODEL}; explicit choice applies to both), or a Claude model such as claude-haiku-5-5")
+                    help=f"Gemini model (agy), pi model as provider/model (default: English {DEFAULT_MODEL}, Burmese {llm.BURMESE_MODEL}; explicit choice applies to both), or a Claude model such as claude-haiku-5-5")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true", help="don't open the browser")
     ap.add_argument("--lan", action="store_true", help="also serve on your local network, e.g. for your phone")

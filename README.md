@@ -37,7 +37,7 @@ EasyNotes runs on macOS. The audio feature needs a Mac with Apple silicon. Insta
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp), which gets the video data and the captions.
 - [uv](https://docs.astral.sh/uv/), which runs the transcript fallback and the audio engine in separate environments.
 - [ffmpeg](https://ffmpeg.org/), which compresses the audio.
-- The [pi](https://github.com/earendil-works/pi) CLI (`pi`), which writes the notes. Sign in to the `openai-codex` provider once. Claude Code (`claude`) also works, as the Choose a model section shows.
+- The Antigravity CLI (`agy`), which writes the notes with Gemini. Sign in once. pi (`pi`) and Claude Code (`claude`) also work, as the Choose a model section shows.
 
 To install the first four tools with Homebrew, run this command:
 
@@ -129,15 +129,16 @@ The voices are `af_heart` (the default), `af_bella`, `am_michael`, `am_fenrir`, 
 
 ## Choose a model
 
-The default model is `openai-codex/gpt-6-luna`, which runs through pi. Burmese notes, glossaries, and topic summaries use `openai-codex/gpt-6.1-sol` by default. Use `--model` to select one model for every language; an explicit choice such as `--model openai-codex/gpt-6-luna` is honored for Burmese too. Topic picks use the English default unless you set `--model`.
+The default model is `gemini-3.8-flash`, which runs through agy. Burmese notes, glossaries, and topic summaries use `gemini-3.8-flash-high` by default. Use `--model` to select one model for every language; an explicit choice such as `--model openai-codex/gpt-6-luna` is honored for Burmese too. Topic picks use the English default unless you set `--model`.
 
 | Value of `--model` | CLI that runs |
 |---|---|
+| A Gemini model, for example `gemini-3.8-flash` or `gemini-3.8-flash-high` | agy |
 | `provider/model`, for example `openai-codex/gpt-6-luna` or `opencode-go/gpt-6-luna` | pi |
 | A Claude model, for example `claude-haiku-5-5` or `sonnet` | Claude Code |
-| `pi:` or `claude:` followed by a model name | The CLI that the prefix names |
+| `agy:`, `pi:`, or `claude:` followed by a model name | The CLI that the prefix names |
 
-To see the models that pi can use, run `pi --list-models`. The model setting is part of the server command, for example `python3 ytnotes.py --model claude-haiku-5-5`.
+To see the models that agy can use, run `agy models`. For pi, run `pi --list-models`. The model setting is part of the server command, for example `python3 ytnotes.py --model claude-haiku-5-5`.
 
 pi runs with its tools, sessions, extensions, and project files turned off. It gets only the prompt and the transcript.
 
@@ -149,7 +150,7 @@ The app makes a note in these steps:
 2. If YouTube blocks the caption download, youtube-transcript-api gets the captions in a different way, in the same language.
 3. The model reads the title, the description, and the start of the transcript, and decides if the video is a conversation, a talk, or a tutorial.
 4. For a tutorial, `context.py` reads the GitHub repos, gists, and docs pages that the description links to. From a repo, it reads the README, the file list, and a few key files. The model then uses the real code instead of guessing it from speech.
-5. pi or Claude Code writes the notes from the chapters, the linked sources, and the transcript. English notes follow the rules in `skills/simple-english/SKILL.md`. Burmese notes and glossary definitions use Burmese.
+5. agy, pi, or Claude Code writes the notes from the chapters, the linked sources, and the transcript. English notes follow the rules in `skills/simple-english/SKILL.md`. Burmese notes and glossary definitions use Burmese.
 6. For a tutorial, yt-dlp downloads the video at 720p or lower, and ffmpeg takes one frame for each step. The frames are in `notes/frames/`.
 7. For audio, `tts.py` changes the notes into a spoken script and Kokoro records it. ffmpeg then compresses the recording to an `.m4a` file.
 
@@ -168,7 +169,7 @@ The project has these files and folders:
 | `daily.py` | The daily watch list: your channels, their RSS feeds, and the picks. |
 | `ROADMAP.md` | Ideas for improving tutorial notes. |
 | `context.py` | The code that gets chapters and reads the repos and docs that a video links to. |
-| `llm.py` | The code that sends prompts to pi or Claude Code. |
+| `llm.py` | The code that sends prompts to agy, pi, or Claude Code. |
 | `skills/simple-english/` | A copy of the simple-english skill, with its license and source. |
 | `assets/` | The app icon in SVG and PNG. |
 | `extension/` | The Chrome extension. |
@@ -182,7 +183,7 @@ These are the errors that you can see, and what to do:
 - "No English or Burmese transcript available": The video has no English or Burmese captions, or YouTube blocks both caption methods. Try again later or use a different video.
 - "Address already in use": Another copy of the server is running. Stop it with Ctrl+C, or start the server with `--port 8766`.
 - "529 Overloaded" or a similar error from the model: The model provider is busy. Try again after a few minutes.
-- "Notes failed" with a sign-in message: Sign in to pi or Claude Code again, then try again.
+- "Notes failed" with a sign-in message: Sign in to agy, pi, or Claude Code again, then try again.
 - The audio does not start: Make sure that you downloaded the Kokoro model. See the Requirements section.
 
 ## Credits
