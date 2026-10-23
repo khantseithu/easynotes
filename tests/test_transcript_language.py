@@ -31,20 +31,15 @@ class TranscriptLanguageTests(unittest.TestCase):
         self.assertEqual(run.call_args.args[0][run.call_args.args[0].index("--languages") + 1], "my")
 
     def test_burmese_prompts_keep_parser_headings_and_localize_prose(self):
-        notes = ytnotes.notes_prompt("conversation", "my")
+        notes = ytnotes.notes_prompt("my")
         self.assertIn("## TL;DR", notes)
         self.assertIn("## Glossary", notes)
         self.assertIn("clear, natural Burmese", notes)
         self.assertIn("one clear Burmese sentence", notes)
         self.assertNotIn("simple-english skill", notes)
 
-        tutorial = ytnotes.notes_prompt("tutorial", "my")
-        self.assertIn("## Goal", tutorial)
-        self.assertIn("## Steps", tutorial)
-        self.assertIn("Tutorial step headings may be Burmese", tutorial)
-
     def test_english_prompts_keep_english_rules(self):
-        notes = ytnotes.notes_prompt("conversation", "en")
+        notes = ytnotes.notes_prompt("en")
         self.assertIn("Write in English.", notes)
         self.assertIn("one clear English sentence", notes)
         self.assertNotIn("clear, natural Burmese", notes)
