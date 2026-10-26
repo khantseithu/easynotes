@@ -10,7 +10,7 @@ The extension uses the EasyNotes server on your Mac. It does not write notes its
 - While the video plays, a bar marks the key idea that the speaker talks about now.
 - When a video has no notes, select Make notes. The notes appear in the panel when they are ready.
 - Select Listen to record and play the audio version, as in the app.
-- Glossary terms, action items and the voice setting work as they do in the app.
+- Glossary terms, action items, diagrams and the voice setting work as they do in the app.
 - Select the Library button to see all your notes, or to make notes from a link or a topic.
 - Right-click a YouTube link, or a YouTube page, and select Make notes with EasyNotes.
 - The toolbar icon shows a check mark on videos that already have notes.
@@ -38,7 +38,7 @@ The extension connects to `http://127.0.0.1:8765` by default. To use a different
 | `content.js` | The script on YouTube pages that jumps the video to a timestamp. |
 | `options.html`, `options.js` | The settings page. |
 | `lib.js` | Code that the panel, the settings page and the service worker share. |
-| `vendor/` | Copies of [marked](https://github.com/markedjs/marked) 12.0.2 (MIT) and [DOMPurify](https://github.com/cure53/DOMPurify) 3.1.6 (Apache 2.0 or MPL 2.0), with their licenses. Chrome extensions cannot load code from a CDN. |
+| `vendor/` | Copies of [marked](https://github.com/markedjs/marked) 12.0.2 (MIT), [DOMPurify](https://github.com/cure53/DOMPurify) 3.1.6 (Apache 2.0 or MPL 2.0) and [Pele](https://pele.run) 1.10.0 (MIT), with their licenses. Chrome extensions cannot load code from a CDN. The server also gives this copy of Pele to the app. |
 | `icons/` | The app icon at 16, 32, 48 and 128 pixels. |
 
 ## Limits

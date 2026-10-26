@@ -54,6 +54,12 @@ Every abbreviation and acronym used anywhere in the notes above (e.g. LTV, CAC, 
 a smart newcomer to the field would not know (e.g. churn, payback period). Skip everyday words, product names and analogies entirely: never list a skipped term or comment on what you skipped.
 Sort alphabetically, as "- **TERM** (full name, if it is an abbreviation): one clear {language} sentence explaining it, in the context of this video."
 Omit this section only if the notes use no such terms."""
+DIAGRAM_RULE = """Diagrams. When a process, cycle, decision, hierarchy, timeline or system is much clearer as a picture than as bullets,
+draw it as a Mermaid diagram in a fenced code block tagged "mermaid", directly under the bullets it explains. {where}
+Use at most {count}, and none when the bullets already say it clearly. Never put a diagram in the {first} section.
+Start each diagram with an "accTitle:" line that says what it shows. Prefer "flowchart LR" or "flowchart TD".
+Keep node labels to a few words in the output language, wrap labels that contain punctuation in double quotes,
+and do not use styles, classes, click actions or links. Draw only what the source says."""
 
 NOTES_PROMPT = """Turn the YouTube transcript on stdin into notes good enough that the reader does not need to watch the video.
 
@@ -81,6 +87,9 @@ Only if the video teaches named models or step-by-step processes. Lay each out c
 Concrete things to do, as "- [ ] ..." checkboxes.
 
 """ + GLOSSARY_SECTION.format(language="English") + """
+
+""" + DIAGRAM_RULE.format(where="Frameworks and multi-step key ideas are the usual places.", count="two diagrams",
+                          first="TL;DR") + """
 
 Length should match the substance: about 300 words for a 10-minute video, up to about 1500 for a long interview.
 Use only what is in the transcript, except glossary definitions, which may use general knowledge. Timestamps must come from the [mm:ss] markers in the transcript.
@@ -120,6 +129,9 @@ Bullets: the errors, warnings and pitfalls that the presenter hits or mentions, 
 What the reader has at the end, and the next steps or extensions that the video suggests.
 
 """ + GLOSSARY_SECTION.format(language="English") + """
+
+""" + DIAGRAM_RULE.format(where="Good uses: how the parts of the finished project connect, or a request or data flow, under the step that builds it.",
+                          count="two diagrams", first="Goal") + """
 
 Sources. Stdin can contain these blocks before the transcript:
 - "Chapters": the video's own chapters. Use them to shape the steps, but split or merge chapters when a step needs it.
@@ -548,6 +560,8 @@ Concrete things to do, as "- [ ] ..." checkboxes. Omit if there are none.
 
 {GLOSSARY_SECTION.format(language="Burmese" if language == "my" else "English")}
 
+{DIAGRAM_RULE.format(where="Put it in Key ideas.", count="one diagram", first="TL;DR")}
+
 Use only information in the article, except glossary definitions. Output only the notes.'''
     prompt += "\n\n" + output_language_rules(language)
     source = article[:400000]
@@ -945,6 +959,10 @@ class Handler(BaseHTTPRequestHandler):
             f = ROOT / "assets" / m.group(1)
             ctype = {"svg": "image/svg+xml", "png": "image/png", "ico": "image/x-icon"}[m.group(2)]
             return self.send(200, f.read_bytes(), ctype) if f.exists() else self.send(404, {"error": "not found"})
+        if self.path == "/vendor/pele.global.js":
+            # The extension needs its own copy, so the app shares it instead of loading Pele from a CDN.
+            return self.send(200, (ROOT / "extension" / "vendor" / "pele.global.js").read_bytes(),
+                             "text/javascript; charset=utf-8")
         if self.path == "/":
             return self.send(200, (ROOT / "ytnotes.html").read_bytes(), "text/html; charset=utf-8")
         if self.path == "/api/notes":
