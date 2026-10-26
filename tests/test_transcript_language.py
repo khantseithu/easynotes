@@ -49,6 +49,15 @@ class TranscriptLanguageTests(unittest.TestCase):
         self.assertIn("one clear English sentence", notes)
         self.assertNotIn("clear, natural Burmese", notes)
 
+    def test_note_prompts_ask_for_a_spoken_tone(self):
+        for language in ("en", "my"):
+            for kind in ("conversation", "tutorial"):
+                self.assertIn("spoken tone", ytnotes.notes_prompt(kind, language))
+            self.assertIn("spoken tone", ytnotes.glossary_prompt(language))
+        self.assertIn("use contractions", ytnotes.notes_prompt("conversation", "en"))
+        self.assertNotIn("use contractions", ytnotes.notes_prompt("conversation", "my"))
+        self.assertIn("spoken, everyday Burmese", ytnotes.notes_prompt("conversation", "my"))
+
     def test_add_glossary_uses_note_language(self):
         self.assertIn("Burmese", ytnotes.glossary_prompt("my"))
         self.assertIn('## Glossary', ytnotes.glossary_prompt("my"))
