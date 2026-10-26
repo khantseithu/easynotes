@@ -225,6 +225,37 @@ h1 { font-family: var(--sans); font-size: 30px; line-height: 1.18; letter-spacin
 .btn.danger { background: var(--danger); border-color: var(--danger); color: var(--accent-ink); }
 .btn.danger:hover { filter: brightness(1.06); }
 .act-msg.err { color: var(--danger); }
+.actions a.btn[download] { color: var(--muted); }
+.end-mark { height: 1px; margin-top: 8px; }
+
+mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color: inherit; border-radius: 3px; padding: 1px 0; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.hl-bar { position: fixed; z-index: 40; display: none; flex-direction: column; gap: 8px; padding: 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--raised); box-shadow: var(--shadow); transform: translateX(-50%); }
+.hl-bar.on { display: flex; }
+.hl-bar .row { display: flex; gap: 6px; }
+.hl-bar .btn { height: 34px; font-size: 13.5px; }
+.hl-bar textarea { width: 260px; max-width: calc(100vw - 48px); min-height: 72px; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line); background: transparent; color: var(--text); font: 14px/1.45 var(--sans); resize: vertical; outline: none; }
+.hl-bar textarea:focus { border-color: var(--accent); }
+.hl-bar .msg { font-size: 12.5px; color: var(--danger); margin: 0; }
+
+.hl-list { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); font-family: var(--sans); }
+.hl-list h2 { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 10px; }
+.hl-item { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.hl-item blockquote { margin: 0 0 6px; padding-left: 12px; border-left: 2px solid var(--accent); font-family: var(--serif); font-size: 16px; line-height: 1.55; color: var(--text); }
+.hl-item p { margin: 0 0 8px 14px; font-size: 14.5px; line-height: 1.5; color: var(--muted); }
+.hl-item .btn { height: 30px; padding: 0 10px; font-size: 12.5px; color: var(--muted); }
+.hl-item .btn:hover { color: var(--danger); border-color: var(--danger); }
+
+.item .snip { margin-top: 3px; font-size: 12.5px; line-height: 1.45; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.unread { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
+.filter-row { display: flex; gap: 6px; }
+.filter-row input { flex: 1; min-width: 0; }
+.chip { flex: none; height: 33px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line); background: none; font-size: 12.5px; color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: transparent; color: var(--text); }
+.lib-head { flex-wrap: wrap; row-gap: 2px; }
+.lib-head > span { white-space: nowrap; }
+.lib-links { margin-left: auto; white-space: nowrap; }
+.lib-links a { padding-left: 12px; color: var(--accent); text-decoration: none; }
+.lib-links a:hover { text-decoration: underline; }
 
 .md { font-family: var(--serif); font-size: 19px; line-height: 1.68; color: var(--text); }
 .md > :first-child { margin-top: 32px; }
@@ -246,6 +277,11 @@ h1 { font-family: var(--sans); font-size: 30px; line-height: 1.18; letter-spacin
 .md pre { background: var(--hover); padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: .8em 0 1.1em; }
 .md pre code { background: none; padding: 0; font-size: .82em; line-height: 1.5; }
 .md img { display: block; max-width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); margin: .4em 0 1em; }
+.md .diagram { margin: .6em 0 1.2em; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised);
+  font: 14px/1.4 var(--sans); --pele-bg: var(--raised); --pele-fg: var(--text); --pele-muted: var(--muted); --pele-line: var(--muted);
+  --pele-surface: var(--bg); --pele-surface-alt: var(--hover); --pele-border: var(--faint); --pele-accent: var(--accent);
+  --pele-font: var(--sans); --pele-radius: 6px; }
+.md .diagram svg { margin: 0 auto; max-width: 100%; height: auto; }
 .md li.task { list-style: none; margin-left: -1.2em; display: flex; gap: 12px; align-items: flex-start; }
 .md li.task input { appearance: none; -webkit-appearance: none; width: 20px; height: 20px; margin: .3em 0 0; border: 1.5px solid var(--faint); border-radius: 6px; flex: none;
                     cursor: pointer; display: grid; place-items: center; transition: background .15s, border-color .15s; }
@@ -418,8 +454,8 @@ h1 { font-family: var(--sans); font-size: 30px; line-height: 1.18; letter-spacin
     <p class="hint" id="hint" aria-live="polite"></p>
   </form>
   <div class="today-nav"><button class="item" id="today-btn" aria-current="false"><div class="t">Today</div><div class="m" id="today-meta">New videos worth watching</div></button></div>
-  <div class="lib-head"><strong>Library</strong><span id="lib-stats"></span></div>
-  <div class="filter" id="filter"><label class="vh" for="q">Filter notes</label><input id="q" type="search" placeholder="Filter notes"></div>
+  <div class="lib-head"><strong>Library</strong><span id="lib-stats"></span><span class="lib-links"><a href="/api/export.zip" download>Export all</a><a href="/api/export/flashcards.csv" download>Flashcards</a></span></div>
+  <div class="filter" id="filter"><label class="vh" for="q">Search notes</label><div class="filter-row"><input id="q" type="search" placeholder="Search notes"><button type="button" class="chip" id="unread-only" aria-pressed="false">Unread</button></div></div>
   <ul class="list" id="list" aria-live="polite"></ul>
 </aside>
 <div class="scrim" id="scrim"></div>
@@ -462,6 +498,15 @@ h1 { font-family: var(--sans); font-size: 30px; line-height: 1.18; letter-spacin
 </div>
 <audio id="audio" preload="metadata"></audio>
 <div class="pop" id="pop" role="tooltip"></div>
+<div class="hl-bar" id="hl-bar" role="toolbar" aria-label="Highlight the selected text">
+  <div class="row"><button class="btn primary" id="hl-save">Highlight</button><button class="btn" id="hl-open">Add a comment</button></div>
+  <form id="hl-form" hidden>
+    <label class="vh" for="hl-text">Comment on this passage</label>
+    <textarea id="hl-text" placeholder="Your comment"></textarea>
+    <div class="row"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="hl-cancel">Cancel</button></div>
+  </form>
+  <p class="msg" id="hl-msg" role="status"></p>
+</div>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -489,13 +534,15 @@ const ICON = {
   ext: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>`,
   system: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>`,
   light: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`,
+  check: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
+  download: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>`,
   trash: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>`,
   dark: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>`,
 };
 const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
 const EXAMPLES = ["saas distribution", "founder-led sales", "pricing strategy", "product-led growth"];
 
-const state = { notes: [], collections: [], voices: [], current: null, note: null, jobs: [], minutes: store.get("minutes", 60), q: "", playing: null, expandedFolders: store.get("expandedFolders", {}), expandedChannels: store.get("expandedChannels", {}), folderOrder: store.get("folderOrder", []), noteOrder: store.get("noteOrder", []), pinnedItems: store.get("pinnedItems", []) };
+const state = { notes: [], collections: [], voices: [], current: null, note: null, jobs: [], minutes: store.get("minutes", 60), q: "", playing: null, expandedFolders: store.get("expandedFolders", {}), expandedChannels: store.get("expandedChannels", {}), folderOrder: store.get("folderOrder", []), noteOrder: store.get("noteOrder", []), pinnedItems: store.get("pinnedItems", []), unreadOnly: store.get("unreadOnly", false), hits: [] };
 
 function applyTheme() {
   const t = store.get("theme", "system");
@@ -532,7 +579,75 @@ $("#in").addEventListener("input", () => {
 $("#in").addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#composer").requestSubmit(); }
 });
-$("#q").addEventListener("input", e => { state.q = e.target.value.toLowerCase(); renderList(); });
+$("#q").addEventListener("input", e => { state.q = e.target.value.toLowerCase(); renderList(); searchText(); });
+let searchTimer = null;
+function searchText() {
+  clearTimeout(searchTimer);
+  const q = state.q.trim();
+  if (q.length < 2) { state.hits = []; return renderList(); }
+  searchTimer = setTimeout(async () => {
+    const hits = await api(`/api/search?q=${encodeURIComponent(q)}`).catch(() => []);
+    if (state.q.trim() !== q) return;
+    state.hits = hits;
+    renderList();
+  }, 200);
+}
+$("#unread-only").onclick = e => {
+  state.unreadOnly = !state.unreadOnly;
+  store.set("unreadOnly", state.unreadOnly);
+  e.currentTarget.setAttribute("aria-pressed", state.unreadOnly);
+  renderList();
+};
+
+// The toolbar that appears when text in a note is selected.
+const hlBar = $("#hl-bar"), hlForm = $("#hl-form"), hlText = $("#hl-text"), hlMsg = $("#hl-msg");
+let hlQuote = "";
+function selectedQuote() {
+  const sel = getSelection(), md = $("#md");
+  if (!md || !sel || sel.isCollapsed || !sel.rangeCount) return "";
+  if (!md.contains(sel.anchorNode) || !md.contains(sel.focusNode)) return "";
+  // Diagram labels are SVG text, where a <mark> would hide the label.
+  if ([sel.anchorNode, sel.focusNode].some(node => (node.nodeType === 1 ? node : node.parentElement)?.closest(".diagram"))) return "";
+  return sel.toString().replace(/\s+/g, " ").trim();
+}
+function hideHlBar() {
+  hlBar.classList.remove("on");
+  hlForm.hidden = true;
+  hlText.value = "";
+  hlMsg.textContent = "";
+  state.hlEditing = false;
+}
+function syncHlBar() {
+  if (state.hlEditing) return;
+  hlQuote = selectedQuote();
+  if (hlQuote.length < 2) return hideHlBar();
+  const rect = getSelection().getRangeAt(0).getBoundingClientRect();
+  hlBar.classList.add("on");
+  const w = hlBar.offsetWidth, h = hlBar.offsetHeight;
+  hlBar.style.left = `${Math.min(innerWidth - w / 2 - 8, Math.max(w / 2 + 8, rect.left + rect.width / 2))}px`;
+  hlBar.style.top = `${rect.top - h - 10 > 8 ? rect.top - h - 10 : rect.bottom + 10}px`;
+}
+document.addEventListener("selectionchange", () => requestAnimationFrame(syncHlBar));
+hlBar.addEventListener("mousedown", e => { if (!e.target.closest("textarea")) e.preventDefault(); });
+async function saveHighlight(comment) {
+  const n = state.note, quote = hlQuote;
+  if (!n || !quote) return;
+  try {
+    const item = await api(`/api/notes/${n.id}/highlights`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ quote, comment }) });
+    n.highlights = [...(n.highlights || []), item];
+    markText($("#md"), item.quote, item.id);
+    getSelection().removeAllRanges();
+    hideHlBar();
+    renderHighlights();
+  } catch (e) {
+    hlMsg.textContent = e.message;
+  }
+}
+$("#hl-save").onclick = () => saveHighlight("");
+$("#hl-open").onclick = () => { state.hlEditing = true; hlForm.hidden = false; hlText.focus(); };
+$("#hl-cancel").onclick = hideHlBar;
+hlForm.addEventListener("submit", e => { e.preventDefault(); saveHighlight(hlText.value.trim()); });
+addEventListener("keydown", e => { if (e.key === "Escape" && hlBar.classList.contains("on")) hideHlBar(); });
 
 function renderList() {
   const pinKey = (kind, id) => `${kind}:${id}`;
@@ -543,13 +658,14 @@ function renderList() {
     return [...items].sort((a, b) => Number(isPinned(kind, b.id)) - Number(isPinned(kind, a.id)) || (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER) || date(b) - date(a));
   };
   const match = x => !state.q || (x.title + " " + (x.channel || "")).toLowerCase().includes(state.q);
+  const unreadOk = x => !state.unreadOnly || !x.read_at;
   const playlistNoteIds = new Set(state.collections.filter(c => c.kind === "playlist").flatMap(c => (c.videos || []).map(v => v.id)));
   const notes = ordered(state.notes.filter(n => !playlistNoteIds.has(n.id)), "noteOrder", "note");
   const noteById = new Map(state.notes.map(n => [n.id, n]));
   const collectionDate = c => Math.max(timestamp(c), ...(c.videos || []).map(v => timestamp(noteById.get(v.id) || {})));
   const cols = ordered(state.collections, "folderOrder", "folder", collectionDate).map(c => {
-    const children = (c.videos || []).filter(v => v.read_mins && (!state.q || (v.title + " " + (v.channel || "")).toLowerCase().includes(state.q)));
-    return { ...c, children, matches: match(c) || children.length > 0, channelName: (c.channel || "").trim() || (c.kind === "topic" ? "Topics" : "Other") };
+    const children = (c.videos || []).filter(v => v.read_mins && (!state.q || (v.title + " " + (v.channel || "")).toLowerCase().includes(state.q)) && unreadOk(noteById.get(v.id) || {}));
+    return { ...c, children, matches: (match(c) && !state.unreadOnly) || children.length > 0, channelName: (c.channel || "").trim() || (c.kind === "topic" ? "Topics" : "Other") };
   });
   const channelName = n => (n.channel || "").trim() || "Other";
   const channels = new Map();
@@ -558,10 +674,13 @@ function renderList() {
     channels.get(name)[type].push(item);
   };
   cols.forEach(c => { if (c.matches) addToChannel(c.channelName, "collections", c); });
-  notes.forEach(n => { if (match(n)) addToChannel(channelName(n), "notes", n); });
+  notes.forEach(n => { if (match(n) && unreadOk(n)) addToChannel(channelName(n), "notes", n); });
   const saved = state.notes.reduce((a, n) => a + Math.max(0, n.secs - n.read_mins * 60), 0);
   $("#lib-stats").textContent = state.notes.length ? `${state.notes.length} notes${saved ? ` · ${dur(saved)} saved` : ""}` : "";
-  $("#filter").classList.toggle("on", state.notes.length > 5 || state.collections.length > 0);
+  $("#filter").classList.toggle("on", state.notes.length > 0 || state.collections.length > 0);
+  const textHits = state.q.trim().length >= 2 ? state.hits.filter(h => unreadOk(noteById.get(h.id) || {})) : [];
+  const hitItems = textHits.length ? `<li class="lib-label">In note text</li>` + textHits.map(h => `
+    <li><button class="item" data-id="${esc(h.id)}" aria-current="${h.id === state.current}"><div class="t">${esc(h.title)}</div><div class="snip">${esc(h.snippet)}</div></button></li>`).join("") : "";
   const jobs = state.jobs.map(j => `
     <li class="job ${j.status === "error" ? "err" : ""}">
       <div class="t">${esc(j.title || j.label)}</div>
@@ -589,7 +708,7 @@ function renderList() {
   };
   const renderNote = (n, channel) => `
     <li class="sort-row" data-sortable="note" data-sort-id="${esc(n.id)}" data-sort-group="${esc(channel)}"><button class="sort-handle" data-drag-handle aria-label="Reorder ${esc(n.title)}. Use arrow keys to move" title="Drag or use ↑/↓ to reorder" draggable="true" ${state.q ? "hidden" : ""}>⠿</button><button class="item" data-id="${esc(n.id)}" aria-current="${n.id === state.current}">
-      <div class="t">${esc(n.title)}</div>
+      <div class="t">${n.read_at ? "" : `<span class="unread" aria-hidden="true"></span><span class="vh">Unread: </span>`}${esc(n.title)}</div>
       <div class="m"><span>${esc(n.channel)}</span><span class="dot">${n.read_mins} min read</span>${
         state.playing === n.id ? `<span class="dot playing">Playing</span>` : n.audio && n.language !== "my" ? `<span class="dot">Audio</span>` : ""}</div>
     </button></li>`;
@@ -603,7 +722,7 @@ function renderList() {
     const noteItems = channel.notes.map(n => renderNote(n, key)).join("");
     return `<li><div class="channel-row"><button class="channel-toggle" data-channel="${esc(key)}" aria-label="${forcedOpen ? `${esc(key)}, expanded while filtering` : `${expanded ? "Collapse" : "Expand"} ${esc(key)}`}" aria-expanded="${expanded}" ${forcedOpen ? 'disabled title="Clear search to collapse"' : ""}><span>›</span><span class="channel-name">${esc(key)}</span><span class="channel-count">${count}</span></button></div>${expanded ? `<ul class="folder-children">${collectionItems}${noteItems}</ul>` : ""}</li>`;
   }).join("");
-  $("#list").innerHTML = jobs + (sections || (state.jobs.length ? "" : `<li class="empty-lib">${state.q ? "No notes match." : "Notes you make will appear here."}</li>`));
+  $("#list").innerHTML = jobs + hitItems + (sections || (state.jobs.length || hitItems ? "" : `<li class="empty-lib">${state.q ? "No notes match." : "Notes you make will appear here."}</li>`));
   todayMeta();
 }
 function togglePin(kind, id) {
@@ -767,6 +886,8 @@ function welcome() {
   renderList();
 }
 $("#view").addEventListener("click", e => {
+  const del = e.target.closest("[data-del-hl]");
+  if (del) return removeHighlight(del.dataset.delHl);
   const pin = e.target.closest("[data-pin-kind]");
   if (pin) {
     const kind = pin.dataset.pinKind, id = pin.dataset.pinId;
@@ -842,6 +963,40 @@ function enhance(root, n) {
       Gotchas: "သတိပြုရန်များ", Result: "ရလဒ်",
     };
     root.querySelectorAll("h2").forEach(h => { h.textContent = labels[h.textContent.trim()] || h.textContent; });
+  }
+}
+
+// Mermaid blocks in a note become diagrams. Pele is large, so it loads only when a note has one.
+let peleReady = null;
+const diagrams = [];
+function loadPele() {
+  return peleReady ??= new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "/vendor/pele.global.js";
+    s.onload = () => resolve(window.pele);
+    s.onerror = () => { peleReady = null; s.remove(); reject(new Error("Pele did not load")); };
+    document.head.append(s);
+  });
+}
+
+async function drawDiagrams(root) {
+  diagrams.splice(0).forEach(d => d.destroy());
+  const blocks = [...root.querySelectorAll("pre > code.language-mermaid")];
+  if (!blocks.length) return;
+  let pele;
+  try { pele = await loadPele(); } catch { return; }
+  for (const code of blocks) {
+    const pre = code.parentElement;
+    if (!pre.isConnected) continue;
+    const fig = document.createElement("figure");
+    fig.className = "diagram";
+    pre.replaceWith(fig);
+    // If Pele can't read the diagram, show its source instead of an error.
+    diagrams.push(pele.mount(fig, code.textContent, {
+      links: false, images: false, zoom: "auto",
+      sanitize: svg => DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true }, RETURN_DOM_FRAGMENT: true }),
+      onError: () => { if (fig.isConnected) fig.replaceWith(pre); },
+    }));
   }
 }
 
@@ -930,6 +1085,7 @@ $("#toc").addEventListener("click", e => {
 async function openNote(id) {
   state.current = id;
   state.confirmDelete = null;
+  hideHlBar();
   history.replaceState(null, "", `#${id}`);
   renderList();
   $("#view").innerHTML = `<div style="padding-top:24px"><div class="sk" style="width:40%"></div><div class="sk" style="height:30px;width:85%"></div><div class="sk"></div><div class="sk" style="width:92%"></div><div class="sk" style="width:70%"></div></div>`;
@@ -947,15 +1103,97 @@ async function openNote(id) {
     <h1>${esc(n.title)}</h1>
     <div class="actions" id="actions"></div>
     <div class="md" id="md">${DOMPurify.sanitize(marked.parse(n.markdown))}</div>
+    <div class="end-mark" id="end"></div>
+    <section class="hl-list" id="hl-list" aria-label="Your highlights"></section>
     ${col && (col.prev || col.next) ? `<nav class="pager" aria-label="${esc(col.title)}">
       ${col.prev ? `<a class="prev" href="#${col.prev.id}"><small>Previous</small><b>${esc(col.prev.title)}</b></a>` : ""}
       ${col.next ? `<a class="next" href="#${col.next.id}"><small>Next</small><b>${esc(col.next.title)}</b></a>` : ""}
     </nav>` : ""}`;
   enhance($("#md"), n);
+  (n.highlights || []).forEach(h => markText($("#md"), h.quote, h.id));
+  drawDiagrams($("#md"));
   $("#view").querySelectorAll(".crumb, .pager a").forEach(a => { a.removeAttribute("target"); a.removeAttribute("rel"); });
   renderActions();
+  renderHighlights();
   buildToc();
+  watchEnd(n);
   scrollTo({ top: 0 });
+}
+
+// A note counts as read once the reader reaches its end.
+let endObserver = null;
+function watchEnd(n) {
+  endObserver?.disconnect();
+  const end = $("#end");
+  if (!end || n.read_at || !("IntersectionObserver" in window)) return;
+  endObserver = new IntersectionObserver(([entry]) => {
+    if (!entry.isIntersecting || state.current !== n.id || state.note?.read_at) return;
+    endObserver.disconnect();
+    setRead(n.id, true);
+  });
+  endObserver.observe(end);
+}
+
+async function setRead(id, read) {
+  const res = await api(`/api/notes/${id}/read`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ read }) });
+  state.notes = state.notes.map(x => x.id === id ? { ...x, read_at: res.read_at } : x);
+  if (state.note?.id === id) {
+    state.note = { ...state.note, read_at: res.read_at };
+    renderActions();
+  }
+  renderList();
+}
+
+// Wrap the first place where the quote appears in the text with <mark>. Works across inline elements.
+function markText(root, quote, id) {
+  const pattern = quote.split(" ").map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*");
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: node => node.parentElement.closest(".diagram, code.language-mermaid") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+  });
+  const parts = [];
+  let text = "";
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    parts.push({ node, start: text.length });
+    text += node.data;
+  }
+  const found = new RegExp(pattern).exec(text);
+  if (!found) return false;
+  const from = found.index, to = from + found[0].length;
+  parts.forEach(({ node, start }) => {
+    const end = start + node.data.length;
+    if (end <= from || start >= to) return;
+    let part = node;
+    const cut = Math.max(from, start) - start;
+    if (cut > 0) part = part.splitText(cut);
+    const length = Math.min(to, end) - Math.max(from, start);
+    if (length < part.data.length) part.splitText(length);
+    const mark = document.createElement("mark");
+    mark.className = "hl";
+    mark.dataset.hl = id;
+    part.parentNode.insertBefore(mark, part);
+    mark.appendChild(part);
+  });
+  return true;
+}
+
+function renderHighlights() {
+  const list = $("#hl-list");
+  if (!list) return;
+  const items = state.note?.highlights || [];
+  list.innerHTML = items.length ? `<h2>Your highlights</h2>` + items.map(h => `
+    <div class="hl-item">
+      <blockquote>${esc(h.quote)}</blockquote>
+      ${h.comment ? `<p>${esc(h.comment)}</p>` : ""}
+      <button class="btn" data-del-hl="${esc(h.id)}">Remove</button>
+    </div>`).join("") : "";
+}
+
+async function removeHighlight(id) {
+  const n = state.note;
+  await api(`/api/notes/${n.id}/highlights/${id}`, { method: "DELETE" });
+  n.highlights = n.highlights.filter(h => h.id !== id);
+  document.querySelectorAll(`mark.hl[data-hl="${id}"]`).forEach(m => m.replaceWith(...m.childNodes));
+  renderHighlights();
 }
 
 function voiceOf() { const v = store.get("voice", state.voices[0]?.id); return state.voices.some(x => x.id === v) ? v : state.voices[0]?.id; }
@@ -975,9 +1213,12 @@ function renderActions(msg, kind, pct) {
     ${audioSupported ? `<label class="vh" for="voice">Voice</label><select class="voice" id="voice">${state.voices.map(v => `<option value="${v.id}" ${v.id === voice ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select>` : ""}
     <a class="btn" href="${esc(n.url || `https://youtu.be/${n.id}`)}" target="_blank" rel="noopener">${ICON.ext}<span>${n.kind === "article" ? "Read article" : "Watch"}</span></a>
     ${pinButton("note", n.id, n.title)}
+    <button class="btn" id="read-toggle" aria-pressed="${!!n.read_at}">${ICON.check}<span>${n.read_at ? "Mark unread" : "Mark read"}</span></button>
+    <a class="btn" href="/api/notes/${n.id}/export.md" download>${ICON.download}<span>Export</span></a>
     ${kind === "err" ? `<span class="act-msg err">${esc(msg)}</span>` : ""}
     <button class="btn del" id="del" aria-label="Delete notes" title="Delete notes" ${msg && kind !== "err" ? "disabled" : ""}>${ICON.trash}</button>`;
   $("#del").onclick = () => { state.confirmDelete = n.id; renderActions(); $("#del-yes").focus(); };
+  $("#read-toggle").onclick = () => setRead(n.id, !n.read_at);
   if (kind === "err") $("#listen").querySelector("span:last-child").textContent = "Try again";
   if (audioSupported) {
     $("#voice").onchange = e => { store.set("voice", e.target.value); renderActions(); };
@@ -1283,6 +1524,7 @@ addEventListener("hashchange", route);
 applyTheme();
 renderSeg();
 $("#p-speed").textContent = `${store.get("speed", 1)}×`;
+$("#unread-only").setAttribute("aria-pressed", state.unreadOnly);
 syncPlayer();
 Promise.all([api("/api/voices").then(v => { state.voices = v; }), loadNotes(), loadCollections(), loadDaily().catch(() => null), resumeJobs().catch(() => null)]).then(() => {
   if (route()) return;

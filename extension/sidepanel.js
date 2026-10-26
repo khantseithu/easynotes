@@ -186,6 +186,7 @@ async function noteView(id) {
     <div class="actions" id="actions"></div>
     <div class="md" id="md">${DOMPurify.sanitize(marked.parse(n.markdown).replaceAll('src="/frames/', `src="${state.server}/frames/`))}</div>`;
   enhance($("#md"), n, new Set(await local.get(`done:${n.id}`, [])));
+  drawDiagrams($("#md"));
   renderActions();
   scrollTo({ top: 0 });
   followVideo();
@@ -233,6 +234,40 @@ function enhance(root, n, done) {
     linkTerms(root, gh, terms);
   }
   state.terms = Object.fromEntries(terms.map(t => [t.id, t]));
+}
+
+// Mermaid blocks in a note become diagrams. Pele is large, so it loads only when a note has one.
+let peleReady = null;
+const diagrams = [];
+function loadPele() {
+  return peleReady ??= new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "vendor/pele.global.js";
+    s.onload = () => resolve(window.pele);
+    s.onerror = () => { peleReady = null; s.remove(); reject(new Error("Pele did not load")); };
+    document.head.append(s);
+  });
+}
+
+async function drawDiagrams(root) {
+  diagrams.splice(0).forEach(d => d.destroy());
+  const blocks = [...root.querySelectorAll("pre > code.language-mermaid")];
+  if (!blocks.length) return;
+  let pele;
+  try { pele = await loadPele(); } catch { return; }
+  for (const code of blocks) {
+    const pre = code.parentElement;
+    if (!pre.isConnected) continue;
+    const fig = document.createElement("figure");
+    fig.className = "diagram";
+    pre.replaceWith(fig);
+    // If Pele can't read the diagram, show its source instead of an error.
+    diagrams.push(pele.mount(fig, code.textContent, {
+      links: false, images: false, zoom: "auto",
+      sanitize: svg => DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true }, RETURN_DOM_FRAGMENT: true }),
+      onError: () => { if (fig.isConnected) fig.replaceWith(pre); },
+    }));
+  }
 }
 
 function linkTerms(root, stopAt, terms) {

@@ -13,6 +13,8 @@ Each note has these parts:
 - Action items as checkboxes.
 - A glossary that explains each abbreviation and jargon term.
 
+When a process, a cycle or a system is easier to understand as a picture, the note also has a diagram. The model writes the diagram in [Mermaid](https://mermaid.js.org) text, and [Pele](https://pele.run) draws it in the app and in the Chrome extension. The diagram uses the colors of the light or dark theme. If Pele can't read a diagram, the app shows its Mermaid text instead. Audio versions skip diagrams.
+
 English notes use plain English. The app gives the writing rules of the [simple-english](https://github.com/AminBlg/SimpleEnglish) skill to the model. Sentences are short, verbs are active, and the notes have no filler words.
 
 Burmese videos and articles get Burmese notes. Audio is unavailable for Burmese notes because the current Kokoro voices do not support Burmese.
@@ -63,6 +65,20 @@ To listen to a note, select Listen. The first recording of a note takes about on
 To delete a note, select the trash button next to Listen, and then select Delete. The app removes the note and its audio. You can't undo this. The Chrome extension has the same button.
 
 Glossary terms have a dotted underline in the text. Select a term to see what it means. The full glossary is at the end of each note.
+
+## Search, read marks, highlights and export
+
+Type in the Search box at the top of the library to find words in the text of your notes, not only in the titles. Each note that matches shows a short piece of the text around the word. Every word that you type must appear in the note. Select Unread to hide the notes that you have read.
+
+A note counts as read when you scroll to its end. To change this yourself, select Mark read or Mark unread below the title.
+
+To keep a passage, select some text in a note. A small bar appears above the text. Select Highlight to mark the passage, or Add a comment to write a note about it. Your highlights appear at the end of the note, and you can remove them there. They are saved on your Mac in `notes/highlights.json`.
+
+To take your notes elsewhere, use these downloads:
+
+- Export under a note saves that note as a Markdown file. The file has a short header with the title, the channel and the link, and it lists your highlights at the end. Obsidian and most other note apps can open it.
+- Export all in the library saves every note as a Markdown file in a zip file.
+- Flashcards in the library saves each glossary term as a row of a CSV file. In Anki, choose Import and select the file. The file has no header row, and each row has the term, its explanation, and the title of the note.
 
 ## Today: a daily watch list
 
@@ -136,7 +152,8 @@ The app makes a note in these steps:
 1. yt-dlp gets the title, the channel, the length, the chapters, the description, and the captions of the video. For Burmese originals, it prefers Burmese captions; otherwise it prefers English and falls back to Burmese.
 2. If YouTube blocks the caption download, youtube-transcript-api gets the captions in a different way, in the same language.
 3. agy, pi, or Claude Code writes the notes from the chapters and the transcript. English notes follow the rules in `skills/simple-english/SKILL.md`. Burmese notes and glossary definitions use Burmese.
-4. For audio, `tts.py` changes the notes into a spoken script and Kokoro records it. ffmpeg then compresses the recording to an `.m4a` file.
+4. The app and the Chrome extension draw each `mermaid` code block in the note as a diagram with Pele. Pele loads only when a note has a diagram.
+5. For audio, `tts.py` changes the notes into a spoken script and Kokoro records it. ffmpeg then compresses the recording to an `.m4a` file.
 
 Before saving Burmese output, the app checks for unrelated foreign scripts and editing remarks. It allows foreign names that appear in the source, and Latin technical terms. If the check fails, it asks the model to repair the output once. If that repair still fails, the app reports an error instead of saving the text.
 
@@ -151,11 +168,12 @@ The project has these files and folders:
 | `tts.py` | The script that records audio with Kokoro. |
 | `ytlearn.py` | The video search and the playlist builder. |
 | `daily.py` | The daily watch list: your channels, their RSS feeds, and the picks. |
+| `library.py` | Search, highlights, and the Markdown and flashcard exports. |
 | `context.py` | The code that gets chapters and reads article pages. |
 | `llm.py` | The code that sends prompts to agy, pi, or Claude Code. |
 | `skills/simple-english/` | A copy of the simple-english skill, with its license and source. |
 | `assets/` | The app icon in SVG and PNG. |
-| `extension/` | The Chrome extension. |
+| `extension/` | The Chrome extension. Its `vendor/` folder also has the copy of Pele that the app uses. |
 | `notes/` | Your notes, the audio files, `index.json`, and `collections.json`. Git ignores this folder. |
 | `playlists/` | The playlists from `ytlearn.py`. Git ignores this folder. |
 
@@ -176,4 +194,5 @@ EasyNotes uses work from these projects:
 - [pi](https://github.com/earendil-works/pi) and [Claude Code](https://claude.com/claude-code), which run the models.
 - [simple-english](https://github.com/AminBlg/SimpleEnglish) by AminBlg, MIT license. A copy is in `skills/simple-english/`.
 - [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), the [mlx-community](https://huggingface.co/mlx-community/Kokoro-82M-bf16) conversion, and [mlx-audio](https://github.com/Blaizzy/mlx-audio).
+- [Pele](https://github.com/obsidianmd/pele) by Obsidian, MIT license, which draws the diagrams. A copy is in `extension/vendor/`.
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api).
