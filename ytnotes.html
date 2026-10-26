@@ -277,6 +277,11 @@ mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color
 .md pre { background: var(--hover); padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: .8em 0 1.1em; }
 .md pre code { background: none; padding: 0; font-size: .82em; line-height: 1.5; }
 .md img { display: block; max-width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); margin: .4em 0 1em; }
+.md .diagram { margin: .6em 0 1.2em; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised);
+  font: 14px/1.4 var(--sans); --pele-bg: var(--raised); --pele-fg: var(--text); --pele-muted: var(--muted); --pele-line: var(--muted);
+  --pele-surface: var(--bg); --pele-surface-alt: var(--hover); --pele-border: var(--faint); --pele-accent: var(--accent);
+  --pele-font: var(--sans); --pele-radius: 6px; }
+.md .diagram svg { margin: 0 auto; max-width: 100%; height: auto; }
 .md li.task { list-style: none; margin-left: -1.2em; display: flex; gap: 12px; align-items: flex-start; }
 .md li.task input { appearance: none; -webkit-appearance: none; width: 20px; height: 20px; margin: .3em 0 0; border: 1.5px solid var(--faint); border-radius: 6px; flex: none;
                     cursor: pointer; display: grid; place-items: center; transition: background .15s, border-color .15s; }
@@ -601,6 +606,8 @@ function selectedQuote() {
   const sel = getSelection(), md = $("#md");
   if (!md || !sel || sel.isCollapsed || !sel.rangeCount) return "";
   if (!md.contains(sel.anchorNode) || !md.contains(sel.focusNode)) return "";
+  // Diagram labels are SVG text, where a <mark> would hide the label.
+  if ([sel.anchorNode, sel.focusNode].some(node => (node.nodeType === 1 ? node : node.parentElement)?.closest(".diagram"))) return "";
   return sel.toString().replace(/\s+/g, " ").trim();
 }
 function hideHlBar() {
@@ -959,6 +966,40 @@ function enhance(root, n) {
   }
 }
 
+// Mermaid blocks in a note become diagrams. Pele is large, so it loads only when a note has one.
+let peleReady = null;
+const diagrams = [];
+function loadPele() {
+  return peleReady ??= new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "/vendor/pele.global.js";
+    s.onload = () => resolve(window.pele);
+    s.onerror = () => { peleReady = null; s.remove(); reject(new Error("Pele did not load")); };
+    document.head.append(s);
+  });
+}
+
+async function drawDiagrams(root) {
+  diagrams.splice(0).forEach(d => d.destroy());
+  const blocks = [...root.querySelectorAll("pre > code.language-mermaid")];
+  if (!blocks.length) return;
+  let pele;
+  try { pele = await loadPele(); } catch { return; }
+  for (const code of blocks) {
+    const pre = code.parentElement;
+    if (!pre.isConnected) continue;
+    const fig = document.createElement("figure");
+    fig.className = "diagram";
+    pre.replaceWith(fig);
+    // If Pele can't read the diagram, show its source instead of an error.
+    diagrams.push(pele.mount(fig, code.textContent, {
+      links: false, images: false, zoom: "auto",
+      sanitize: svg => DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true }, RETURN_DOM_FRAGMENT: true }),
+      onError: () => { if (fig.isConnected) fig.replaceWith(pre); },
+    }));
+  }
+}
+
 function linkTerms(root, stopAt, terms) {
   const sorted = terms.filter(t => t.term.length > 1).sort((a, b) => b.term.length - a.term.length);
   const used = new Set();
@@ -1070,6 +1111,7 @@ async function openNote(id) {
     </nav>` : ""}`;
   enhance($("#md"), n);
   (n.highlights || []).forEach(h => markText($("#md"), h.quote, h.id));
+  drawDiagrams($("#md"));
   $("#view").querySelectorAll(".crumb, .pager a").forEach(a => { a.removeAttribute("target"); a.removeAttribute("rel"); });
   renderActions();
   renderHighlights();
@@ -1105,7 +1147,9 @@ async function setRead(id, read) {
 // Wrap the first place where the quote appears in the text with <mark>. Works across inline elements.
 function markText(root, quote, id) {
   const pattern = quote.split(" ").map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*");
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: node => node.parentElement.closest(".diagram, code.language-mermaid") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+  });
   const parts = [];
   let text = "";
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
