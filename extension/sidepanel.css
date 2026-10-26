@@ -104,6 +104,11 @@ h1 { font-size: 21px; line-height: 1.22; letter-spacing: -0.018em; margin: 0 0 1
 .md pre { background: var(--hover); padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: .8em 0 1.1em; }
 .md pre code { background: none; padding: 0; font-size: .82em; line-height: 1.5; }
 .md img { display: block; max-width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); margin: .4em 0 1em; }
+.md .diagram { margin: .6em 0 1.2em; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised);
+  font: 14px/1.4 var(--sans); --pele-bg: var(--raised); --pele-fg: var(--text); --pele-muted: var(--muted); --pele-line: var(--muted);
+  --pele-surface: var(--bg); --pele-surface-alt: var(--hover); --pele-border: var(--faint); --pele-accent: var(--accent);
+  --pele-font: var(--sans); --pele-radius: 6px; }
+.md .diagram svg { margin: 0 auto; max-width: 100%; height: auto; }
 .md li.task { list-style: none; margin-left: -1.15em; display: flex; gap: 10px; align-items: flex-start; }
 .md li.task input { appearance: none; width: 18px; height: 18px; margin: .3em 0 0; border: 1.5px solid var(--faint); border-radius: 5px; flex: none; cursor: pointer;
                     display: grid; place-items: center; transition: background .15s, border-color .15s; }
