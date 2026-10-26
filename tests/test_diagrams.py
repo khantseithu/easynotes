@@ -24,6 +24,7 @@ class DiagramTests(unittest.TestCase):
             prompt = ytnotes.notes_prompt(language).format(
                 title="T", channel="C", duration="1h")
             self.assertIn('tagged "mermaid"', prompt)
+            self.assertLess(prompt.index('"flowchart LR" or "flowchart TD"'), prompt.index('"accTitle:" line immediately after it'))
         self.assertIn("Never put a diagram in the TL;DR section", ytnotes.notes_prompt("en"))
 
     def test_diagrams_are_not_read_aloud(self):
