@@ -56,7 +56,7 @@ Omit this section only if the notes use no such terms."""
 DIAGRAM_RULE = """Diagrams. When a process, cycle, decision, hierarchy, timeline or system is much clearer as a picture than as bullets,
 draw it as a Mermaid diagram in a fenced code block tagged "mermaid", directly under the bullets it explains. {where}
 Use at most {count}, and none when the bullets already say it clearly. Never put a diagram in the {first} section.
-Start each diagram with an "accTitle:" line that says what it shows. Prefer "flowchart LR" or "flowchart TD".
+Start each diagram with "flowchart LR" or "flowchart TD". Put an "accTitle:" line immediately after it that says what the diagram shows.
 Keep node labels to a few words in the output language, wrap labels that contain punctuation in double quotes,
 and do not use styles, classes, click actions or links. Draw only what the source says."""
 
