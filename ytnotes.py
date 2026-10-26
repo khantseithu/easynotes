@@ -16,10 +16,11 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 import context
 import daily
+import library
 import llm
 import transcript
 import ytlearn
@@ -28,6 +29,7 @@ ROOT = Path(__file__).resolve().parent
 NOTES = ROOT / "notes"
 INDEX = NOTES / "index.json"
 COLLECTIONS = NOTES / "collections.json"
+HIGHLIGHTS = NOTES / "highlights.json"
 FRAMES = NOTES / "frames"
 MAX_PLAYLIST = 50
 SKIP_LISTS = ("RD", "WL", "LL", "UL")
@@ -316,6 +318,25 @@ def link_stamps(md, vid):
 
 def load_index():
     return json.loads(INDEX.read_text()) if INDEX.exists() else []
+
+
+def note_text(vid):
+    path = NOTES / f"{vid}.md"
+    return path.read_text() if path.exists() else ""
+
+
+def source_of(meta):
+    return meta.get("url") or f"https://youtu.be/{meta['id']}"
+
+
+def attachment(name):
+    return {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"}
+
+
+def note_entries():
+    """Each saved note with its markdown and highlights, for the exports."""
+    return [(n, note_text(n["id"]), library.highlights_for(HIGHLIGHTS, n["id"])) for n in load_index()
+            if (NOTES / f"{n['id']}.md").exists()]
 
 
 def save_note(meta, body):
@@ -640,6 +661,7 @@ def delete_note(vid):
                 c.setdefault("skipped", {})[vid] = "Notes deleted"
         if cols:
             COLLECTIONS.write_text(json.dumps(cols, indent=2, ensure_ascii=False))
+    library.drop_highlights(HIGHLIGHTS, vid)
     for ext in ("md", "m4a"):
         (NOTES / f"{vid}.{ext}").unlink(missing_ok=True)
     return True
@@ -880,12 +902,14 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
-    def send(self, code, body, ctype="application/json"):
+    def send(self, code, body, ctype="application/json", headers=None):
         data = body if isinstance(body, bytes) else json.dumps(body).encode()
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(data)
 
@@ -913,7 +937,9 @@ class Handler(BaseHTTPRequestHandler):
                 pass
 
     def do_GET(self):
-        self.path = urlparse(self.path).path
+        url = urlparse(self.path)
+        self.path = url.path
+        query = parse_qs(url.query)
         if self.path == "/api/voices":
             return self.send(200, [{"id": v, "label": label} for v, label in VOICES])
         m = re.fullmatch(r"/audio/([\w-]{11})\.m4a", self.path)
@@ -941,12 +967,29 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, (ROOT / "ytnotes.html").read_bytes(), "text/html; charset=utf-8")
         if self.path == "/api/notes":
             return self.send(200, load_index())
+        if self.path == "/api/search":
+            return self.send(200, library.search(load_index(), note_text, query.get("q", [""])[0]))
+        m = re.fullmatch(r"/api/notes/([\w-]{11})/export\.md", self.path)
+        if m:
+            entry = next((e for e in note_entries() if e[0]["id"] == m.group(1)), None)
+            if not entry:
+                return self.send(404, {"error": "not found"})
+            meta, body, highlights = entry
+            return self.send(200, library.note_markdown(meta, body, highlights, source_of(meta)).encode(),
+                             "text/markdown; charset=utf-8", attachment(f"{library.safe_name(meta['title'])}.md"))
+        if self.path == "/api/export/flashcards.csv":
+            return self.send(200, library.flashcards_csv(note_entries()).encode(), "text/csv; charset=utf-8",
+                             attachment("easynotes-flashcards.csv"))
+        if self.path == "/api/export.zip":
+            return self.send(200, library.library_zip(note_entries(), source_of), "application/zip",
+                             attachment("easynotes-library.zip"))
         m = re.fullmatch(r"/api/notes/([\w-]{11})", self.path)
         if m:
             meta = next((n for n in load_index() if n["id"] == m.group(1)), None)
             if not meta:
                 return self.send(404, {"error": "not found"})
-            return self.send(200, {**meta, "markdown": (NOTES / f"{meta['id']}.md").read_text(),
+            return self.send(200, {**meta, "markdown": note_text(meta["id"]),
+                                   "highlights": library.highlights_for(HIGHLIGHTS, meta["id"]),
                                    "collections": note_collections(meta["id"])})
         if self.path == "/api/daily":
             return self.send(200, daily_view())
@@ -965,6 +1008,22 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        m = re.fullmatch(r"/api/notes/([\w-]{11})/read", self.path)
+        if m:
+            if not any(n["id"] == m.group(1) for n in load_index()):
+                return self.send(404, {"error": "not found"})
+            read_at = datetime.now().isoformat(timespec="seconds") if body.get("read") else None
+            update_meta(m.group(1), read_at=read_at)
+            return self.send(200, {"id": m.group(1), "read_at": read_at})
+        m = re.fullmatch(r"/api/notes/([\w-]{11})/highlights", self.path)
+        if m:
+            if not any(n["id"] == m.group(1) for n in load_index()):
+                return self.send(404, {"error": "not found"})
+            try:
+                item = library.add_highlight(HIGHLIGHTS, m.group(1), body.get("quote"), body.get("comment"))
+            except ValueError as e:
+                return self.send(400, {"error": str(e)})
+            return self.send(201, item)
         m = re.fullmatch(r"/api/audio/([\w-]{11})", self.path)
         if m:
             voice = body.get("voice") if body.get("voice") in dict(VOICES) else VOICES[0][0]
@@ -1000,6 +1059,11 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/sources/(UC[\w-]{22})", urlparse(self.path).path)
         if m:
             return self.send(200, DAILY.sources()) if DAILY.remove(m.group(1)) else self.send(404, {"error": "not found"})
+        m = re.fullmatch(r"/api/notes/([\w-]{11})/highlights/(\w+)", urlparse(self.path).path)
+        if m:
+            if not library.delete_highlight(HIGHLIGHTS, m.group(1), m.group(2)):
+                return self.send(404, {"error": "not found"})
+            return self.send(200, {"id": m.group(2), "deleted": True})
         m = re.fullmatch(r"/api/notes/([\w-]{11})", urlparse(self.path).path)
         if not m:
             return self.send(404, {"error": "not found"})
