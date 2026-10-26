@@ -150,29 +150,16 @@ KIND_PROMPT = """Classify the YouTube video described on stdin. Answer with one 
 Output only the word."""
 
 
-def simple_english_rules():
-    path = ROOT / "skills" / "simple-english" / "SKILL.md"
-    if not path.exists():
-        return ""
-    text = path.read_text()
-    section = text.split("## The Document", 1)[-1].split("## The Reply", 1)[0]
-    rules = "\n".join(l for l in section.splitlines() if "references/" not in l).split("\nBefore (AI output):", 1)[0].strip()
-    check = text.split("## Self-Check Before You Deliver", 1)[-1].split("## Modes", 1)[0]
-    doc_check = next((l for l in check.splitlines() if l.startswith("2. Document:")), "")
-    return f"""
-
-Writing rules (the simple-english skill, plain mode). Apply them to every sentence you write.
-The required structure above wins where the two conflict: keep its headings, bullets, checkboxes, timestamps and bold glossary terms.
-Never change verbatim quotes, numbers, names or facts.
-
-<simple-english>
-{rules}
-
-Self-check: {doc_check.removeprefix("2. Document: ")}
-</simple-english>"""
-
-
-WRITING_RULES = simple_english_rules()
+SPOKEN_TONE = """
+Tone. Write the notes in a spoken tone, the way a friend would explain it to you out loud after watching the video or reading the article.
+Talk to the reader directly, with everyday words and short sentences that sound natural when read aloud.
+Keep every specific: frameworks, steps, numbers, examples, names and the reasoning behind claims.
+Skip filler, hype and throat-clearing such as "In this video" or "It's worth noting". No emoji.
+The required structure above wins: keep its headings, bullets, checkboxes, timestamps and bold glossary terms.
+Never change verbatim quotes, numbers, names or facts."""
+ENGLISH_TONE = """
+Call the reader "you" and use contractions (it's, you'll, don't).
+Small spoken links like "so", "here's the thing" and "in other words" are fine when they help the ideas flow. Do not overuse them."""
 
 
 def output_language_rules(language):
@@ -180,9 +167,10 @@ def output_language_rules(language):
         return """
 Write in clear, natural Burmese for a Burmese reader. Use Burmese for explanations and prose, including glossary definitions.
 Keep the required English markdown section headings exactly as written so the app can recognize them. Tutorial step headings may be Burmese.
+Use spoken, everyday Burmese, the way people talk, not formal written Burmese. Prefer spoken endings and particles such as တယ်, ပါတယ်, မယ်, ဘူး, မှာ, နဲ့ and ရဲ့ over written forms such as သည်, မည်, ၏, တွင် and နှင့်.
 Write all explanatory prose in Burmese. Keep Latin text only for names, technical terms, code, commands, file names, versions, numbers, and verbatim source text where appropriate. Explain technical terms in Burmese; include the original English term when that helps identify it. Do not use unrelated scripts, or include drafting, translation, or self-review remarks. Return only the requested note.
-"""
-    return "Write in English.\n" + WRITING_RULES
+""" + SPOKEN_TONE
+    return "Write in English.\n" + SPOKEN_TONE + ENGLISH_TONE
 
 
 def notes_prompt(kind, language):
