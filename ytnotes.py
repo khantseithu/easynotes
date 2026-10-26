@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 import argparse
+import getpass
 import hashlib
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -18,8 +21,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
 
+import access
 import context
 import daily
+import learn
 import library
 import llm
 import transcript
@@ -30,6 +35,9 @@ NOTES = ROOT / "notes"
 INDEX = NOTES / "index.json"
 COLLECTIONS = NOTES / "collections.json"
 HIGHLIGHTS = NOTES / "highlights.json"
+POSITIONS = NOTES / "positions.json"
+LEARN = NOTES / "learn.json"
+AUTH_KEY = NOTES / ".auth-key"
 FRAMES = NOTES / "frames"
 MAX_PLAYLIST = 50
 SKIP_LISTS = ("RD", "WL", "LL", "UL")
@@ -39,6 +47,7 @@ TTS_LOCK = threading.Lock()
 JOBS = {}
 DAILY = daily.Store(NOTES)
 DAILY_JOB = {}
+GATE = access.Gate("", AUTH_KEY)
 VOICES = [
     ("af_heart", "Heart · US female"), ("af_bella", "Bella · US female"),
     ("am_michael", "Michael · US male"), ("am_fenrir", "Fenrir · US male"),
@@ -662,6 +671,8 @@ def delete_note(vid):
         if cols:
             COLLECTIONS.write_text(json.dumps(cols, indent=2, ensure_ascii=False))
     library.drop_highlights(HIGHLIGHTS, vid)
+    library.drop_position(POSITIONS, vid)
+    learn.drop_note(LEARN, vid)
     for ext in ("md", "m4a"):
         (NOTES / f"{vid}.{ext}").unlink(missing_ok=True)
     return True
@@ -697,6 +708,66 @@ def add_glossary(vid, model):
                 n["read_mins"] = max(1, round(n["words"] / 230))
         INDEX.write_text(json.dumps(index, indent=2, ensure_ascii=False))
     return True
+
+
+def note_meta(vid):
+    return next((n for n in load_index() if n["id"] == vid), None)
+
+
+def learning_rules(language):
+    return learn.BURMESE_RULES if language == "my" else output_language_rules("en")
+
+
+def model_failure(out, what):
+    reason = (out.stderr.strip() or out.stdout.strip()).splitlines()
+    return RuntimeError(f"{what} failed: {reason[-1][:200]}" if reason else f"{what} failed")
+
+
+def make_quiz(vid, model):
+    meta = note_meta(vid)
+    if not meta:
+        raise RuntimeError("Note not found")
+    language = meta.get("language", "en")
+    prompt = learn.quiz_prompt(meta, learning_rules(language))
+    for attempt in range(2):
+        out = llm.run(prompt, llm.model_for_language(language, model), note_text(vid), timeout=300)
+        if out.returncode != 0:
+            raise model_failure(out, "Quiz")
+        try:
+            return learn.save_quiz(LEARN, vid, learn.parse_quiz(out.stdout))
+        except ValueError:
+            if attempt:
+                raise RuntimeError("Quiz failed: the model did not write usable questions. Try again.")
+
+
+def ask_note(vid, question, model):
+    meta = note_meta(vid)
+    if not meta:
+        raise RuntimeError("Note not found")
+    language = meta.get("language", "en")
+    text = learn.chat_input(note_text(vid), learn.chat_for(LEARN, vid), question)
+    out = llm.run(learn.chat_prompt(meta, learning_rules(language)), llm.model_for_language(language, model), text, timeout=300)
+    if out.returncode != 0 or not out.stdout.strip():
+        raise model_failure(out, "Answer")
+    return learn.add_chat(LEARN, vid, {"role": "user", "text": question}, {"role": "assistant", "text": out.stdout.strip()})
+
+
+def start_task(message, fn, *args):
+    """Run a model call in the background. Phones drop requests that wait too long, so the app polls the job."""
+    job_id = uuid.uuid4().hex[:12]
+    job = JOBS[job_id] = {"id": job_id, "status": "running", "message": message, "ids": []}
+
+    def run():
+        try:
+            job.update(status="done", result=fn(*args), message="Done")
+        except Exception as e:
+            job.update(status="error", message=str(e))
+    threading.Thread(target=run, daemon=True).start()
+    return job
+
+
+def review_stats():
+    return learn.stats(LEARN, notes=load_index())
 
 
 def load_collections():
@@ -896,6 +967,9 @@ def daily_view():
             "job": DAILY_JOB if DAILY_JOB.get("status") == "running" else None}
 
 
+PUBLIC_PATHS = {"/manifest.webmanifest", "/favicon.ico", "/api/login"}
+
+
 class Handler(BaseHTTPRequestHandler):
     model = None
 
@@ -936,10 +1010,22 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
 
+    def signed_in(self, path):
+        """Ask for the password when the server has one and the request is not from this Mac."""
+        if path in PUBLIC_PATHS or path.startswith("/assets/") or GATE.allowed(self.client_address[0], self.headers):
+            return True
+        if path == "/":
+            self.send(401, (ROOT / "login.html").read_bytes(), "text/html; charset=utf-8")
+        else:
+            self.send(401, {"error": "Sign in first"})
+        return False
+
     def do_GET(self):
         url = urlparse(self.path)
         self.path = url.path
         query = parse_qs(url.query)
+        if not self.signed_in(self.path):
+            return
         if self.path == "/api/voices":
             return self.send(200, [{"id": v, "label": label} for v, label in VOICES])
         m = re.fullmatch(r"/audio/([\w-]{11})\.m4a", self.path)
@@ -983,6 +1069,9 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/export.zip":
             return self.send(200, library.library_zip(note_entries(), source_of), "application/zip",
                              attachment("easynotes-library.zip"))
+        m = re.fullmatch(r"/api/notes/([\w-]{11})/position", self.path)
+        if m:
+            return self.send(200, {"id": m.group(1), "secs": library.position_for(POSITIONS, m.group(1))})
         m = re.fullmatch(r"/api/notes/([\w-]{11})", self.path)
         if m:
             meta = next((n for n in load_index() if n["id"] == m.group(1)), None)
@@ -990,7 +1079,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(404, {"error": "not found"})
             return self.send(200, {**meta, "markdown": note_text(meta["id"]),
                                    "highlights": library.highlights_for(HIGHLIGHTS, meta["id"]),
-                                   "collections": note_collections(meta["id"])})
+                                   "collections": note_collections(meta["id"]),
+                                   "position": library.position_for(POSITIONS, meta["id"]),
+                                   "quiz": learn.quiz_for(LEARN, meta["id"]),
+                                   "chat": learn.chat_for(LEARN, meta["id"]),
+                                   "in_review": learn.in_review(LEARN, meta["id"])})
+        if self.path == "/api/review":
+            return self.send(200, {"cards": learn.due(LEARN, load_index(), note_text), **review_stats()})
+        if self.path == "/api/review/stats":
+            return self.send(200, review_stats())
         if self.path == "/api/daily":
             return self.send(200, daily_view())
         if self.path == "/api/collections":
@@ -1007,7 +1104,48 @@ class Handler(BaseHTTPRequestHandler):
         self.send(404, {"error": "not found"})
 
     def do_POST(self):
-        body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        self.path = urlparse(self.path).path
+        if not self.signed_in(self.path):
+            return
+        try:
+            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        except ValueError:
+            return self.send(400, {"error": "Bad request"})
+        if self.path == "/api/login":
+            cookie = GATE.sign_in(self.client_address[0], str(body.get("password") or ""))
+            if not cookie:
+                return self.send(401, {"error": "Wrong password, or too many tries. Wait a few minutes."})
+            return self.send(200, {"ok": True}, headers={"Set-Cookie": cookie})
+        m = re.fullmatch(r"/api/notes/([\w-]{11})/(position|quiz|quiz/results|chat)", self.path)
+        if m and not note_meta(m.group(1)):
+            return self.send(404, {"error": "not found"})
+        if m and m.group(2) == "position":
+            try:
+                secs = library.save_position(POSITIONS, m.group(1), body.get("secs") or 0)
+            except (TypeError, ValueError):
+                return self.send(400, {"error": "secs must be a number"})
+            return self.send(200, {"id": m.group(1), "secs": secs})
+        if m and m.group(2) == "quiz":
+            quiz = learn.quiz_for(LEARN, m.group(1))
+            if quiz and not body.get("fresh"):
+                return self.send(200, quiz)
+            return self.send(202, start_task("Writing questions…", make_quiz, m.group(1), self.model))
+        if m and m.group(2) == "quiz/results":
+            answers = body.get("answers") if isinstance(body.get("answers"), dict) else {}
+            terms = [term for term, _ in library.glossary_cards(note_text(m.group(1)))]
+            learn.enroll(LEARN, m.group(1), answers, terms)
+            return self.send(200, review_stats())
+        if m and m.group(2) == "chat":
+            question = " ".join(str(body.get("question") or "").split())
+            if not question:
+                return self.send(400, {"error": "Type a question"})
+            if len(question) > learn.MAX_QUESTION:
+                return self.send(400, {"error": f"Keep the question under {learn.MAX_QUESTION} characters"})
+            return self.send(202, start_task("Thinking…", ask_note, m.group(1), question, self.model))
+        if self.path == "/api/review":
+            if not learn.answer(LEARN, str(body.get("card") or ""), bool(body.get("correct"))):
+                return self.send(404, {"error": "Card not found"})
+            return self.send(200, review_stats())
         m = re.fullmatch(r"/api/notes/([\w-]{11})/read", self.path)
         if m:
             if not any(n["id"] == m.group(1) for n in load_index()):
@@ -1056,6 +1194,12 @@ class Handler(BaseHTTPRequestHandler):
         self.send(202, JOBS[job_id])
 
     def do_DELETE(self):
+        if not self.signed_in(urlparse(self.path).path):
+            return
+        m = re.fullmatch(r"/api/notes/([\w-]{11})/chat", urlparse(self.path).path)
+        if m:
+            learn.clear_chat(LEARN, m.group(1))
+            return self.send(200, {"id": m.group(1), "chat": []})
         m = re.fullmatch(r"/api/sources/(UC[\w-]{22})", urlparse(self.path).path)
         if m:
             return self.send(200, DAILY.sources()) if DAILY.remove(m.group(1)) else self.send(404, {"error": "not found"})
@@ -1082,6 +1226,19 @@ def lan_ip():
             return "127.0.0.1"
 
 
+def tailscale_ip():
+    """This Mac's Tailscale address, which a phone on the same tailnet can open from anywhere."""
+    cli = shutil.which("tailscale") or next((p for p in ["/Applications/Tailscale.app/Contents/MacOS/Tailscale"]
+                                              if Path(p).exists()), None)
+    if not cli:
+        return None
+    try:
+        out = subprocess.run([cli, "ip", "-4"], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return out.stdout.split()[0] if out.returncode == 0 and out.stdout.strip() else None
+
+
 def main():
     ap = argparse.ArgumentParser(description="Read YouTube videos instead of watching them.")
     ap.add_argument("input", nargs="*", help="YouTube links, playlist links, or a topic; omit to open the app")
@@ -1090,7 +1247,9 @@ def main():
                     help=f"Gemini model (agy), pi model as provider/model (default: English {DEFAULT_MODEL}, Burmese {llm.BURMESE_MODEL}; explicit choice applies to both), or a Claude model such as claude-haiku-5-5")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true", help="don't open the browser")
-    ap.add_argument("--lan", action="store_true", help="also serve on your local network, e.g. for your phone")
+    ap.add_argument("--lan", action="store_true", help="also serve on your local network or tailnet, e.g. for your phone")
+    ap.add_argument("--password", action="store_true",
+                    help="ask other devices for a password; prompts for it, or set EASYNOTES_PASSWORD")
     ap.add_argument("--audio", action="store_true", help="also record an audio version with Kokoro")
     ap.add_argument("--voice", default=VOICES[0][0], choices=[v for v, _ in VOICES])
     ap.add_argument("--kind", choices=["auto", *KINDS], default="auto",
@@ -1134,6 +1293,13 @@ def main():
             print(job["message"], file=sys.stderr)
         return
 
+    global GATE
+    password = os.environ.get("EASYNOTES_PASSWORD", "")
+    if args.password and not password:
+        password = getpass.getpass("Password for other devices: ")
+        if not password:
+            sys.exit("The password can't be empty")
+    GATE = access.Gate(password, AUTH_KEY)
     Handler.model = args.model
     threading.Thread(target=auto_daily, args=(args.model,), daemon=True).start()
     server = ThreadingHTTPServer(("0.0.0.0" if args.lan else "127.0.0.1", args.port), Handler)
@@ -1141,6 +1307,11 @@ def main():
     print(f"EasyNotes running at {url}  (Ctrl+C to stop)")
     if args.lan:
         print(f"On your phone (same Wi-Fi): http://{lan_ip()}:{args.port}")
+        ts = tailscale_ip()
+        if ts:
+            print(f"On your phone (anywhere, with Tailscale): http://{ts}:{args.port}")
+        print("Other devices need the password." if GATE.on else
+              "Warning: no password. Each device that can reach this address can open the app. Add --password.")
     if not args.no_open:
         webbrowser.open(url)
     try:

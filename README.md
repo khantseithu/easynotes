@@ -92,6 +92,19 @@ To take your notes elsewhere, use these downloads:
 - Export all in the library saves every note as a Markdown file in a zip file.
 - Flashcards in the library saves each glossary term as a row of a CSV file. In Anki, choose Import and select the file. The file has no header row, and each row has the term, its explanation, and the title of the note.
 
+## Quiz, review and questions
+
+Reading a note is the first step. These tools help you remember it.
+
+- Select Quiz me at the end of a note. The model writes a few multiple-choice questions about the note. Select an answer to see if it is right and why.
+- When you answer the last question, the questions and the glossary terms of the note go into Review.
+- Select Review at the top of the library to see the cards that are due today. A question card asks the question again. A term card shows the term. Think of what it means, select Show answer, and then select Forgot or Knew it.
+- A card comes back one day later at first. Each time that you remember it, the gap gets longer: 3 days, then about a week, then about three weeks. If you forget it, the card starts again at one day.
+- Select New questions under a quiz to get a different set. The old questions leave Review, and the glossary terms stay.
+- To ask about something that is unclear, type a question under Ask about this note. The answer uses the note first. If the note does not cover the question, the answer says so before it uses general knowledge.
+
+Quizzes, review cards and questions are saved on your Mac in `notes/learn.json`. Burmese notes get Burmese questions and answers.
+
 ## Today: a daily watch list
 
 Today is a short list of new videos that are worth your time. It uses only the channels that you choose, so YouTube's recommendations do not decide what you see.
@@ -107,15 +120,27 @@ To make the list from the command line, run `python3 ytnotes.py --daily`. The fi
 
 ## Use the app on your phone
 
-Your phone and your Mac must be on the same Wi-Fi network. Start the server with the `--lan` flag:
+At home, your phone and your Mac can be on the same Wi-Fi network. Start the server with the `--lan` flag:
 
 ```bash
-python3 ytnotes.py --lan
+python3 ytnotes.py --lan --password
 ```
 
-The server shows a second address, for example `http://192.168.1.117:8765`. Open that address on your phone. On an iPhone, select Share and then Add to Home Screen to get an app icon.
+The server asks you for a password, and then shows a second address, for example `http://192.168.1.117:8765`. Open that address on your phone and type the password once. The phone stays signed in for a year, or until you start the server with a different password. On an iPhone, select Share and then Add to Home Screen to get an app icon.
 
-Use `--lan` only on a network that you trust. The app has no password, so each device on the network can open it.
+The Mac that runs the server never asks for the password. To set the password without typing it each time, use the `EASYNOTES_PASSWORD` environment variable. Without `--password`, each device on the network can open the app, so use `--lan` without a password only on a network that you trust.
+
+Read marks, highlights, quizzes, review cards and the audio position are saved on the server. When you stop listening on one device, Listen on the other device shows Resume at the same place.
+
+### Away from home
+
+To read and listen when you are not at home, use [Tailscale](https://tailscale.com). It makes a private network between your own devices, and the personal plan is free. Your Mac must stay on and run the server.
+
+1. Install Tailscale on your Mac and on your phone, and sign in to the same account on both.
+2. Start the server with `python3 ytnotes.py --lan --password`.
+3. The server shows a third address, for example `http://100.101.102.103:8765`. Open that address on your phone, on any network.
+
+Only your own devices can reach a Tailscale address, and the password protects the app if someone else gets one of them. Don't put the app on the public internet without a password. If you put it behind a proxy or a tunnel on the Mac, the proxy must send an `X-Forwarded-For` header, so that the app does not treat its requests as requests from the Mac.
 
 ## Use the Chrome extension
 
@@ -139,6 +164,7 @@ You can also use EasyNotes without the browser. Each command saves its result in
 | `python3 ytnotes.py --add-glossary` | Adds a glossary to old notes that do not have one. |
 | `python3 ytnotes.py --model openai-codex/gpt-6-luna` | Uses a different model. See the Choose a model section. |
 | `python3 ytnotes.py --port 8766` | Starts the server on a different port. |
+| `python3 ytnotes.py --lan --password` | Lets your phone open the app, and asks other devices for a password. |
 | `python3 ytlearn.py "saas distribution" -t 60` | Makes a playlist link with short takeaways in the `playlists/` folder. |
 
 The voices are `af_heart` (the default), `af_bella`, `am_michael`, `am_fenrir`, `bf_emma`, and `bm_george`. The letters `a` and `b` mean American and British. The letters `f` and `m` mean female and male.
@@ -184,14 +210,17 @@ The project has these files and folders:
 | `tts.py` | The script that records audio with Kokoro. |
 | `ytlearn.py` | The video search and the playlist builder. |
 | `daily.py` | The daily watch list: your channels, their RSS feeds, and the picks. |
-| `library.py` | Search, highlights, and the Markdown and flashcard exports. |
+| `library.py` | Search, highlights, the audio position, and the Markdown and flashcard exports. |
+| `learn.py` | Quizzes, review cards and their schedule, and questions about a note. |
+| `access.py` | The password for other devices. |
+| `login.html` | The sign-in page that other devices see when the server has a password. |
 | `ROADMAP.md` | Ideas for improving tutorial notes. |
 | `context.py` | The code that gets chapters and reads the repos and docs that a video links to. |
 | `llm.py` | The code that sends prompts to agy, pi, or Claude Code. |
 | `skills/simple-english/` | A copy of the simple-english skill, with its license and source. |
 | `assets/` | The app icon in SVG and PNG. |
 | `extension/` | The Chrome extension. Its `vendor/` folder also has the copy of Pele that the app uses. |
-| `notes/` | Your notes, the audio files, `index.json`, and `collections.json`. Git ignores this folder. |
+| `notes/` | Your notes, the audio files, `index.json`, `collections.json`, `highlights.json`, `positions.json`, and `learn.json`. Git ignores this folder. |
 | `playlists/` | The playlists from `ytlearn.py`. Git ignores this folder. |
 
 ## Troubleshooting
