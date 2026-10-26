@@ -257,6 +257,56 @@ mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color
 .lib-links a { padding-left: 12px; color: var(--accent); text-decoration: none; }
 .lib-links a:hover { text-decoration: underline; }
 
+.learn { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); font-family: var(--sans); }
+.learn h2 { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 10px; }
+.learn > p, .learn .note-line { color: var(--muted); font-size: 14.5px; line-height: 1.55; margin: 0 0 14px; }
+.learn .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.learn .st { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--muted); }
+.learn .err { color: var(--danger); font-size: 13.5px; margin: 10px 0 0; }
+.quiz-list { list-style: none; margin: 0 0 16px; padding: 0; counter-reset: q; }
+.qz { padding: 18px 0; border-bottom: 1px solid var(--line); counter-increment: q; }
+.qz-q, .rv-q { font-family: var(--serif); font-size: 18px; line-height: 1.5; margin: 0 0 12px; }
+.qz-q::before { content: counter(q) ". "; color: var(--faint); font-family: var(--sans); font-size: 14px; font-weight: 600; }
+.choices { display: grid; gap: 8px; }
+.choice { display: flex; align-items: flex-start; gap: 10px; width: 100%; min-height: 44px; padding: 10px 12px; text-align: left; border: 1px solid var(--line); border-radius: 10px;
+          background: var(--raised); font-size: 15px; line-height: 1.45; }
+.choice:hover:not(:disabled) { border-color: var(--accent); }
+.choice:disabled { cursor: default; }
+.choice .k { flex: none; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 650; color: var(--muted); background: var(--hover); }
+.choice.right { border-color: var(--accent); background: var(--accent-soft); }
+.choice.right .k { background: var(--accent); color: var(--accent-ink); }
+.choice.wrong { border-color: var(--danger); }
+.choice.wrong .k { background: var(--danger); color: var(--accent-ink); }
+.choice.dim { opacity: .6; }
+.why { margin: 10px 0 0; font-size: 14.5px; line-height: 1.55; color: var(--muted); }
+.why b { color: var(--text); font-weight: 650; }
+.score { font-size: 15px; margin: 0 0 14px; }
+.score b { font-weight: 650; }
+.qa { margin: 0 0 16px; padding: 0; list-style: none; }
+.qa > li { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.qa .asked { font-size: 14px; font-weight: 600; margin: 0 0 6px; }
+.qa .asked::before { content: "Q  "; color: var(--accent); white-space: pre; }
+.qa .answer { font-family: var(--serif); font-size: 17px; line-height: 1.6; }
+.qa .answer p, .qa .answer ul, .qa .answer ol { margin: 0 0 .6em; }
+.qa .answer ul, .qa .answer ol { padding-left: 1.2em; }
+.qa .answer code { font-size: .85em; background: var(--hover); padding: 1px 5px; border-radius: 4px; }
+.ask { display: flex; align-items: flex-end; gap: 8px; }
+.ask textarea { flex: 1; min-width: 0; min-height: 44px; max-height: 160px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--raised); font-size: 15px; line-height: 1.4; resize: vertical; outline: none; }
+.ask textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ask .btn { height: 44px; }
+.rv-card { margin-top: 32px; padding: 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--raised); font-family: var(--sans); }
+.rv-from { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+.rv-from button { all: unset; cursor: pointer; color: var(--accent); }
+.rv-from button:hover { text-decoration: underline; }
+.rv-from button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.rv-term { font-size: 24px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 16px; }
+.rv-back { font-family: var(--serif); font-size: 18px; line-height: 1.55; margin: 0 0 18px; }
+.rv-card .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.rv-card .row .btn { height: 44px; min-width: 120px; justify-content: center; }
+.rv-card .note-line { color: var(--muted); font-size: 14.5px; margin: 0; }
+.rv-card .err { color: var(--danger); font-size: 13.5px; margin: 10px 0 0; }
+.rv-progress { font-size: 13px; color: var(--muted); margin-top: 14px; font-variant-numeric: tabular-nums; }
+
 .md { font-family: var(--serif); font-size: 19px; line-height: 1.68; color: var(--text); }
 .md > :first-child { margin-top: 32px; }
 .md p { margin: 0 0 1em; }
@@ -418,6 +468,9 @@ mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color
   .actions .confirm { flex: 1 1 100%; margin-left: 0; }
   .field textarea { font-size: 16px; }
   .filter input { font-size: 16px; }
+  .ask textarea { font-size: 16px; }
+  .rv-card { padding: 18px; }
+  .rv-card .row .btn { flex: 1; min-width: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -453,7 +506,7 @@ mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color
     </div>
     <p class="hint" id="hint" aria-live="polite"></p>
   </form>
-  <div class="today-nav"><button class="item" id="today-btn" aria-current="false"><div class="t">Today</div><div class="m" id="today-meta">New videos worth watching</div></button></div>
+  <div class="today-nav"><button class="item" id="today-btn" aria-current="false"><div class="t">Today</div><div class="m" id="today-meta">New videos worth watching</div></button><button class="item" id="review-btn" aria-current="false"><div class="t">Review</div><div class="m" id="review-meta">Remember what you read</div></button></div>
   <div class="lib-head"><strong>Library</strong><span id="lib-stats"></span><span class="lib-links"><a href="/api/export.zip" download>Export all</a><a href="/api/export/flashcards.csv" download>Flashcards</a></span></div>
   <div class="filter" id="filter"><label class="vh" for="q">Search notes</label><div class="filter-row"><input id="q" type="search" placeholder="Search notes"><button type="button" class="chip" id="unread-only" aria-pressed="false">Unread</button></div></div>
   <ul class="list" id="list" aria-live="polite"></ul>
@@ -517,7 +570,22 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
-const api = async (url, opts) => { const r = await fetch(url, opts); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText); return j; };
+const api = async (url, opts) => {
+  const r = await fetch(url, opts);
+  // The sign-in cookie expired or the password changed: the reload shows the sign-in page.
+  if (r.status === 401) { location.reload(); throw new Error("Sign in first"); }
+  const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText); return j;
+};
+const post = (url, body) => api(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+// Model calls run as jobs on the server, because phones drop requests that wait too long.
+async function waitJob(job) {
+  while (job.status === "running") {
+    await new Promise(r => setTimeout(r, 1200));
+    job = await api(`/api/jobs/${job.id}`);
+  }
+  if (job.status === "error") throw new Error(job.message);
+  return job.result;
+}
 const LINK_RE = /(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com|youtu\.be)\/\S+/g;
 const hasLink = s => (s.match(LINK_RE) || []).length > 0 || /^[\w-]{11}$/.test(s.trim());
 function describeInput(s) {
@@ -722,6 +790,7 @@ function renderList() {
     const noteItems = channel.notes.map(n => renderNote(n, key)).join("");
     return `<li><div class="channel-row"><button class="channel-toggle" data-channel="${esc(key)}" aria-label="${forcedOpen ? `${esc(key)}, expanded while filtering` : `${expanded ? "Collapse" : "Expand"} ${esc(key)}`}" aria-expanded="${expanded}" ${forcedOpen ? 'disabled title="Clear search to collapse"' : ""}><span>›</span><span class="channel-name">${esc(key)}</span><span class="channel-count">${count}</span></button></div>${expanded ? `<ul class="folder-children">${collectionItems}${noteItems}</ul>` : ""}</li>`;
   }).join("");
+  reviewMeta();
   $("#list").innerHTML = jobs + hitItems + (sections || (state.jobs.length || hitItems ? "" : `<li class="empty-lib">${state.q ? "No notes match." : "Notes you make will appear here."}</li>`));
   todayMeta();
 }
@@ -1105,6 +1174,8 @@ async function openNote(id) {
     <div class="md" id="md">${DOMPurify.sanitize(marked.parse(n.markdown))}</div>
     <div class="end-mark" id="end"></div>
     <section class="hl-list" id="hl-list" aria-label="Your highlights"></section>
+    <section class="learn" id="quiz" aria-label="Test yourself"></section>
+    <section class="learn" id="chat" aria-label="Ask about this note"></section>
     ${col && (col.prev || col.next) ? `<nav class="pager" aria-label="${esc(col.title)}">
       ${col.prev ? `<a class="prev" href="#${col.prev.id}"><small>Previous</small><b>${esc(col.prev.title)}</b></a>` : ""}
       ${col.next ? `<a class="next" href="#${col.next.id}"><small>Next</small><b>${esc(col.next.title)}</b></a>` : ""}
@@ -1113,8 +1184,11 @@ async function openNote(id) {
   (n.highlights || []).forEach(h => markText($("#md"), h.quote, h.id));
   drawDiagrams($("#md"));
   $("#view").querySelectorAll(".crumb, .pager a").forEach(a => { a.removeAttribute("target"); a.removeAttribute("rel"); });
+  state.quizAnswers = store.get(`quiz:${n.id}`, {});
   renderActions();
   renderHighlights();
+  renderQuiz();
+  renderChat();
   buildToc();
   watchEnd(n);
   scrollTo({ top: 0 });
@@ -1196,6 +1270,255 @@ async function removeHighlight(id) {
   renderHighlights();
 }
 
+// state.note is replaced by a copy in some places, so changes go through its id.
+function patchNote(id, fields) { if (state.note?.id === id) Object.assign(state.note, fields); }
+
+function choiceButtons(q, picked, attr) {
+  const answered = picked !== undefined && picked !== null;
+  return `<div class="choices" role="group" aria-label="Answers">${q.choices.map((c, i) => {
+    const cls = !answered ? "" : i === q.answer ? "right" : i === picked ? "wrong" : "dim";
+    const tag = answered && i === q.answer ? `<span class="vh">, the right answer</span>` : answered && i === picked ? `<span class="vh">, your answer</span>` : "";
+    return `<button class="choice ${cls}" ${attr} data-i="${i}" ${answered ? "disabled" : ""}><span class="k" aria-hidden="true">${"ABCDEFGH"[i]}</span><span>${esc(c)}${tag}</span></button>`;
+  }).join("")}</div>`;
+}
+const verdict = (q, picked) => `<b>${picked === q.answer ? "Right." : "Not quite."}</b> ${esc(q.why)}`;
+
+// Test yourself: questions on the note. Finishing them puts the questions and the glossary terms into Review.
+function renderQuiz(err) {
+  const box = $("#quiz"), n = state.note;
+  if (!box || !n) return;
+  if (n.language === "my") box.lang = "my";
+  const fail = err ? `<p class="err" role="alert">${esc(err)}</p>` : "";
+  if (state.quizBusy === n.id) {
+    box.innerHTML = `<h2>Test yourself</h2><div class="st" role="status"><div class="spin"></div>Writing questions…</div>`;
+    return;
+  }
+  if (!n.quiz) {
+    box.innerHTML = `<h2>Test yourself</h2>
+      <p>Answer a few questions to check what you remember. The questions and the glossary terms then come back in Review, just before you would forget them.</p>
+      <div class="row"><button class="btn primary" id="quiz-make"><span>Quiz me</span></button></div>${fail}`;
+    return;
+  }
+  const qs = n.quiz.questions, answers = state.quizAnswers || {};
+  const done = qs.filter(q => q.id in answers), right = done.filter(q => answers[q.id] === q.answer).length;
+  const finished = done.length === qs.length;
+  box.innerHTML = `<h2>Test yourself</h2>
+    <ol class="quiz-list">${qs.map(q => `
+      <li class="qz"><p class="qz-q">${esc(q.q)}</p>${choiceButtons(q, answers[q.id], `data-quiz="${esc(q.id)}"`)}
+        ${q.id in answers ? `<p class="why" id="why-${esc(q.id)}" tabindex="-1">${verdict(q, answers[q.id])}</p>` : ""}</li>`).join("")}
+    </ol>
+    ${finished ? `<p class="score"><b>${right} of ${qs.length} right.</b>${n.in_review ? " These questions and the glossary terms are in Review now." : ""}</p>`
+      : `<p class="note-line">${done.length} of ${qs.length} answered</p>`}
+    <div class="row">
+      ${finished ? `<button class="btn" id="quiz-again"><span>Try again</span></button>` : ""}
+      <button class="btn" id="quiz-new"><span>New questions</span></button>
+      ${n.in_review && finished ? `<button class="btn" id="go-review"><span>Open Review</span></button>` : ""}
+    </div>${fail}`;
+}
+
+async function makeQuiz(fresh) {
+  const n = state.note;
+  state.quizBusy = n.id;
+  renderQuiz();
+  let err = "";
+  try {
+    const r = await post(`/api/notes/${n.id}/quiz`, { fresh });
+    const quiz = r.questions ? r : await waitJob(r);
+    patchNote(n.id, { quiz });
+    store.set(`quiz:${n.id}`, {});
+    if (state.note?.id === n.id) state.quizAnswers = {};
+  } catch (e) { err = e.message; }
+  if (state.quizBusy === n.id) state.quizBusy = null;
+  if (state.note?.id !== n.id) return;
+  renderQuiz(err);
+  if (!err) $("#quiz .choice")?.focus({ preventScroll: true });
+}
+
+async function answerQuiz(qid, i) {
+  const n = state.note, answers = state.quizAnswers;
+  answers[qid] = i;
+  store.set(`quiz:${n.id}`, answers);
+  let err = "";
+  const qs = n.quiz.questions;
+  if (qs.every(q => q.id in answers)) {
+    try {
+      state.reviewStats = await post(`/api/notes/${n.id}/quiz/results`, { answers: Object.fromEntries(qs.map(q => [q.id, answers[q.id] === q.answer])) });
+      patchNote(n.id, { in_review: true });
+      reviewMeta();
+    } catch (e) { err = e.message; }
+  }
+  if (state.note?.id !== n.id) return;
+  renderQuiz(err);
+  document.getElementById(`why-${qid}`)?.focus({ preventScroll: true });
+}
+
+// Ask about this note: follow-up questions, answered from the note first.
+function renderChat(err) {
+  const box = $("#chat"), n = state.note;
+  if (!box || !n) return;
+  if (n.language === "my") box.lang = "my";
+  const busy = state.chatBusy === n.id, chat = n.chat || [], pairs = [];
+  for (let i = 0; i < chat.length; i++) {
+    if (chat[i].role !== "user") continue;
+    pairs.push({ q: chat[i].text, a: chat[i + 1]?.role === "assistant" ? chat[++i].text : "" });
+  }
+  box.innerHTML = `<h2>Ask about this note</h2>
+    ${pairs.length || busy ? "" : `<p>Ask a question when something is unclear. The answer uses this note first, and says when it goes beyond the note.</p>`}
+    ${pairs.length || busy ? `<ol class="qa">${pairs.map(p => `<li><p class="asked">${esc(p.q)}</p><div class="answer">${DOMPurify.sanitize(marked.parse(p.a))}</div></li>`).join("")}${
+      busy ? `<li><p class="asked">${esc(state.chatPending)}</p><div class="st" role="status"><div class="spin"></div>Thinking…</div></li>` : ""}</ol>` : ""}
+    <form class="ask" id="ask">
+      <label class="vh" for="ask-in">Your question</label>
+      <textarea id="ask-in" rows="1" placeholder="Ask a question about this note" enterkeyhint="send" ${busy ? "disabled" : ""}></textarea>
+      <button class="btn primary" ${busy ? "disabled" : ""}><span>Ask</span></button>
+    </form>
+    ${pairs.length && !busy ? `<div class="row" style="margin-top:10px"><button class="btn" id="chat-clear"><span>Clear questions</span></button></div>` : ""}
+    ${err ? `<p class="err" role="alert">${esc(err)}</p>` : ""}`;
+  box.querySelectorAll(".answer a").forEach(a => { a.target = "_blank"; a.rel = "noopener"; });
+}
+
+async function askNote(question) {
+  const n = state.note;
+  state.chatBusy = n.id;
+  state.chatPending = question;
+  renderChat();
+  let err = "";
+  try {
+    patchNote(n.id, { chat: await waitJob(await post(`/api/notes/${n.id}/chat`, { question })) });
+  } catch (e) { err = e.message; }
+  if (state.chatBusy === n.id) state.chatBusy = null;
+  if (state.note?.id !== n.id) return;
+  renderChat(err);
+  if (err) $("#ask-in").value = question;
+  $("#ask-in").focus({ preventScroll: true });
+}
+
+async function clearChat() {
+  const n = state.note;
+  await api(`/api/notes/${n.id}/chat`, { method: "DELETE" });
+  patchNote(n.id, { chat: [] });
+  renderChat();
+}
+
+$("#view").addEventListener("click", e => {
+  const t = e.target;
+  if (t.closest("#quiz-make")) return makeQuiz(false);
+  if (t.closest("#quiz-new")) return makeQuiz(true);
+  if (t.closest("#quiz-again")) {
+    state.quizAnswers = {};
+    store.set(`quiz:${state.note.id}`, {});
+    renderQuiz();
+    return $("#quiz .choice")?.focus({ preventScroll: true });
+  }
+  if (t.closest("#go-review")) return openReview();
+  const qc = t.closest("[data-quiz]");
+  if (qc) return answerQuiz(qc.dataset.quiz, +qc.dataset.i);
+  if (t.closest("#chat-clear")) return clearChat();
+  const rc = t.closest("[data-rv]");
+  if (rc) return answerCard(+rc.dataset.i);
+  if (t.closest("#rv-show")) { state.review.shown = true; renderReview(); return $("#rv-back")?.focus({ preventScroll: true }); }
+  if (t.closest("#rv-next")) return nextCard();
+  const g = t.closest("[data-grade]");
+  if (g) return gradeCard(g.dataset.grade === "1");
+});
+$("#view").addEventListener("submit", e => {
+  if (e.target.id !== "ask") return;
+  e.preventDefault();
+  const q = $("#ask-in").value.trim();
+  if (q) askNote(q);
+});
+$("#view").addEventListener("keydown", e => {
+  if (e.target.id === "ask-in" && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#ask").requestSubmit(); }
+});
+
+// Review: the questions and glossary terms of quizzed notes. Each comes back a day later at first, then less often each time you remember it.
+const shortDate = iso => new Date(iso + "T12:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+function reviewMeta() {
+  $("#review-btn").setAttribute("aria-current", String(state.current === "review"));
+  const s = state.reviewStats;
+  if (!s) return;
+  $("#review-meta").textContent = s.due ? `${s.due} due today` : s.total ? `Nothing due${s.next ? ` until ${shortDate(s.next)}` : ""}` : "Take a quiz to start";
+}
+async function loadReviewStats() { state.reviewStats = await api("/api/review/stats"); reviewMeta(); }
+
+async function openReview() {
+  state.current = "review"; state.note = null;
+  history.replaceState(null, "", "#review");
+  renderList();
+  $("#layout").classList.remove("has-toc");
+  $("#toc").innerHTML = "";
+  $("#top-title").textContent = "Review";
+  document.title = "Review · EasyNotes";
+  $("#view").innerHTML = `<div style="padding-top:24px"><div class="sk" style="width:30%"></div><div class="sk" style="height:30px;width:50%"></div><div class="sk"></div></div>`;
+  let r;
+  try { r = await api("/api/review"); } catch { return welcome(); }
+  if (state.current !== "review") return;
+  state.review = { cards: r.cards, i: 0, right: 0, shown: false, picked: null, err: "" };
+  state.reviewStats = { due: r.due, total: r.total, next: r.next };
+  reviewMeta();
+  renderReview();
+  scrollTo({ top: 0 });
+}
+
+function renderReview() {
+  const rv = state.review, card = rv.cards[rv.i], s = state.reviewStats || {};
+  const head = `<div class="kicker"><span>Review</span>${rv.cards.length ? `<span>${rv.cards.length} cards today</span>` : ""}</div><h1>Review</h1>`;
+  const fail = rv.err ? `<p class="err" role="alert">${esc(rv.err)}</p>` : "";
+  if (!card) {
+    const next = s.next ? ` The next card is due on ${new Date(s.next + "T12:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}.` : "";
+    const text = rv.cards.length ? `Done for today: ${rv.right} of ${rv.cards.length} right.${next}`
+      : s.total ? `Nothing is due today.${next}`
+      : "Nothing to review yet. Take the quiz at the end of a note. Its questions and glossary terms then come back here, a day later at first and then less often each time you remember them.";
+    $("#view").innerHTML = head + `<p class="col-note">${esc(text)}</p>${fail}`;
+    return;
+  }
+  const lang = card.language === "my" ? ' lang="my"' : "";
+  const body = card.kind === "quiz"
+    ? `<div${lang}><p class="rv-q">${esc(card.q)}</p>${choiceButtons(card, rv.picked, "data-rv")}
+        ${rv.picked !== null ? `<p class="why" id="rv-why" tabindex="-1">${verdict(card, rv.picked)}</p>` : ""}</div>
+        ${rv.picked !== null ? `<div class="row"><button class="btn primary" id="rv-next"><span>Next</span></button></div>` : ""}`
+    : `<div${lang}><p class="rv-term">${esc(card.term)}</p>${rv.shown ? `<p class="rv-back" id="rv-back" tabindex="-1">${esc(card.back)}</p>` : ""}</div>
+        ${rv.shown ? `<div class="row"><button class="btn" data-grade="0"><span>Forgot</span></button><button class="btn primary" data-grade="1"><span>Knew it</span></button></div>`
+          : `<p class="note-line">What does it mean? Think of the answer, then check it.</p><div class="row"><button class="btn primary" id="rv-show"><span>Show answer</span></button></div>`}`;
+  $("#view").innerHTML = head + `
+    <div class="rv-card">
+      <div class="rv-from">From <button data-open="${esc(card.note)}">${esc(card.title)}</button></div>
+      ${body}
+      <div class="rv-progress">Card ${rv.i + 1} of ${rv.cards.length}</div>
+      ${fail}
+    </div>`;
+}
+
+async function sendGrade(card, correct) {
+  const rv = state.review;
+  try {
+    state.reviewStats = await post("/api/review", { card: card.id, correct });
+    rv.err = "";
+  } catch (e) { rv.err = e.message; }
+  reviewMeta();
+  if (rv.err && state.current === "review") renderReview();
+}
+function answerCard(i) {
+  const rv = state.review, card = rv.cards[rv.i];
+  rv.picked = i;
+  if (i === card.answer) rv.right++;
+  renderReview();
+  $("#rv-why")?.focus({ preventScroll: true });
+  sendGrade(card, i === card.answer);
+}
+function gradeCard(correct) {
+  const card = state.review.cards[state.review.i];
+  if (correct) state.review.right++;
+  sendGrade(card, correct);
+  nextCard();
+}
+function nextCard() {
+  const rv = state.review;
+  Object.assign(rv, { i: rv.i + 1, picked: null, shown: false });
+  renderReview();
+  ($("#view .choice") || $("#rv-show") || $("#view h1"))?.focus({ preventScroll: true });
+}
+$("#review-btn").onclick = () => { openReview(); if (mq.matches) side(false); };
+
 function voiceOf() { const v = store.get("voice", state.voices[0]?.id); return state.voices.some(x => x.id === v) ? v : state.voices[0]?.id; }
 function renderActions(msg, kind, pct) {
   const n = state.note;
@@ -1205,7 +1528,7 @@ function renderActions(msg, kind, pct) {
   const audioSupported = n.language !== "my";
   const ready = audioSupported && n.audio && n.audio.voice === voice;
   const isPlaying = state.playing === n.id && !audio.paused;
-  const label = !audioSupported ? "Burmese audio unavailable" : msg ? msg : ready ? (isPlaying ? "Pause" : state.playing === n.id ? "Resume" : "Listen") : n.audio ? "Record in this voice" : `Listen · ~${Math.max(1, Math.round(n.read_mins * 1.3))} min`;
+  const label = !audioSupported ? "Burmese audio unavailable" : msg ? msg : ready ? (isPlaying ? "Pause" : state.playing === n.id ? "Resume" : n.position > 5 ? `Resume at ${clock(n.position)}` : "Listen") : n.audio ? "Record in this voice" : `Listen · ~${Math.max(1, Math.round(n.read_mins * 1.3))} min`;
   $("#actions").innerHTML = `
     <button class="btn primary" id="listen" ${!audioSupported || msg && kind !== "err" ? "disabled" : ""} title="${!audioSupported ? "Burmese audio is not supported yet" : ""}">
       <span class="fill" style="width:${pct || 0}%"></span>${msg && kind !== "err" ? `<span class="spin" style="border-color:oklch(1 0 0 / .3);border-top-color:currentColor"></span>` : isPlaying ? ICON.pause : ICON.headphones}<span>${esc(label)}</span>
@@ -1249,9 +1572,9 @@ async function deleteNote(n) {
   }
   state.confirmDelete = null;
   if (state.playing === n.id) $("#p-close").click();
-  try { localStorage.removeItem(`pos:${n.id}`); } catch {}
+  try { localStorage.removeItem(`pos:${n.id}`); localStorage.removeItem(`quiz:${n.id}`); } catch {}
   const col = n.collections?.[0];
-  await Promise.all([loadNotes(), loadCollections()]);
+  await Promise.all([loadNotes(), loadCollections(), loadReviewStats().catch(() => null)]);
   if (state.current !== n.id) return;
   if (col) openCollection(col.id);
   else if (state.notes.length) openNote(state.notes[0].id);
@@ -1290,8 +1613,13 @@ function play(n) {
     state.playing = n.id;
     state.playingMeta = n;
     audio.src = `/audio/${n.id}.m4a?v=${n.audio.voice}`;
-    const resume = store.get(`pos:${n.id}`, 0);
-    audio.addEventListener("loadedmetadata", () => { if (resume && resume < audio.duration - 5) audio.currentTime = resume; }, { once: true });
+    // The server keeps the position, so listening can continue on another device.
+    const local = store.get(`pos:${n.id}`, 0);
+    const resume = api(`/api/notes/${n.id}/position`).then(r => r.secs).catch(() => local);
+    audio.addEventListener("loadedmetadata", async () => {
+      const at = await resume;
+      if (state.playing === n.id && at && at < audio.duration - 5) audio.currentTime = at;
+    }, { once: true });
     $("#p-title").textContent = n.title;
     if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: n.title, artist: n.channel, album: "EasyNotes" });
   }
@@ -1311,7 +1639,7 @@ $("#p-play").onclick = togglePlay;
 $("#p-back").onclick = () => { audio.currentTime = Math.max(0, audio.currentTime - 15); };
 $("#p-fwd").onclick = () => { audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 15); };
 $("#p-title").onclick = () => { if (state.playing) openNote(state.playing); };
-$("#p-close").onclick = () => { audio.pause(); player.classList.remove("on"); state.playing = null; setPlayerH(); renderList(); renderActions(); };
+$("#p-close").onclick = () => { if (state.playing && audio.currentTime && !audio.ended) savePosition(state.playing, audio.currentTime); audio.pause(); player.classList.remove("on"); state.playing = null; setPlayerH(); renderList(); renderActions(); };
 $("#p-speed").onclick = () => {
   const next = SPEEDS[(SPEEDS.indexOf(store.get("speed", 1)) + 1) % SPEEDS.length];
   store.set("speed", next); audio.playbackRate = next; $("#p-speed").textContent = `${next}×`;
@@ -1323,14 +1651,20 @@ audio.addEventListener("play", syncPlayer);
 audio.addEventListener("pause", syncPlayer);
 audio.addEventListener("loadedmetadata", () => { $("#p-dur").textContent = clock(audio.duration); });
 let lastSave = 0;
+function savePosition(id, secs) {
+  store.set(`pos:${id}`, secs);
+  patchNote(id, { position: secs });
+  post(`/api/notes/${id}/position`, { secs }).catch(() => {});
+}
+audio.addEventListener("pause", () => { if (state.playing && audio.currentTime && !audio.ended) savePosition(state.playing, audio.currentTime); });
 audio.addEventListener("timeupdate", () => {
   if (!seeking && audio.duration) { $("#p-seek").value = audio.currentTime / audio.duration * 100; $("#p-cur").textContent = clock(audio.currentTime); }
-  if (state.playing && Date.now() - lastSave > 4000) { store.set(`pos:${state.playing}`, audio.currentTime); lastSave = Date.now(); }
+  if (state.playing && !audio.paused && Date.now() - lastSave > 5000) { savePosition(state.playing, audio.currentTime); lastSave = Date.now(); }
   if ("mediaSession" in navigator && audio.duration && navigator.mediaSession.setPositionState) {
     try { navigator.mediaSession.setPositionState({ duration: audio.duration, position: audio.currentTime, playbackRate: audio.playbackRate }); } catch {}
   }
 });
-audio.addEventListener("ended", () => { if (state.playing) store.set(`pos:${state.playing}`, 0); syncPlayer(); });
+audio.addEventListener("ended", () => { if (state.playing) savePosition(state.playing, 0); syncPlayer(); });
 if ("mediaSession" in navigator) {
   const ms = navigator.mediaSession;
   ms.setActionHandler("play", () => audio.play());
@@ -1515,6 +1849,7 @@ $("#view").addEventListener("click", async e => {
 function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   if (h === "today") { if (state.current !== "today") openToday(); return true; }
+  if (h === "review") { if (state.current !== "review") openReview(); return true; }
   if (h.startsWith("c/")) { if (state.current !== "c:" + h.slice(2)) openCollection(h.slice(2)); return true; }
   if (/^[\w-]{11}$/.test(h) && state.notes.some(n => n.id === h)) { if (state.current !== h) openNote(h); return true; }
   return false;
@@ -1526,7 +1861,7 @@ renderSeg();
 $("#p-speed").textContent = `${store.get("speed", 1)}×`;
 $("#unread-only").setAttribute("aria-pressed", state.unreadOnly);
 syncPlayer();
-Promise.all([api("/api/voices").then(v => { state.voices = v; }), loadNotes(), loadCollections(), loadDaily().catch(() => null), resumeJobs().catch(() => null)]).then(() => {
+Promise.all([api("/api/voices").then(v => { state.voices = v; }), loadNotes(), loadCollections(), loadDaily().catch(() => null), loadReviewStats().catch(() => null), resumeJobs().catch(() => null)]).then(() => {
   if (route()) return;
   if (state.daily?.sources.length) openToday();
   else if (state.notes.length) openNote(state.notes[0].id);

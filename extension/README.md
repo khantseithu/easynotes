@@ -26,7 +26,7 @@ After you change a file in this folder, select the reload button for EasyNotes o
 
 ## Settings
 
-The extension connects to `http://127.0.0.1:8765` by default. To use a different port or a server on another computer, open the extension's Settings from the gear button in the panel. For a server on another computer, start it with `--lan` and type the address that it shows. Chrome asks you to allow the extension to reach that address.
+The extension connects to `http://127.0.0.1:8765` by default. To use a different port or a server on another computer, open the extension's Settings from the gear button in the panel. For a server on another computer, start it with `--lan` and type the address that it shows. Chrome asks you to allow the extension to reach that address. If that server has a password, the extension can't sign in, so use the extension on the Mac that runs the server.
 
 ## Files
 

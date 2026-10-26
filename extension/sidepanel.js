@@ -449,8 +449,12 @@ async function play(n) {
   if (state.playing?.id !== n.id) {
     state.playing = n;
     audio.src = `${state.server}/audio/${n.id}.m4a?v=${n.audio.voice}`;
-    const resume = await local.get(`pos:${n.id}`, 0);
-    audio.addEventListener("loadedmetadata", () => { if (resume && resume < audio.duration - 5) audio.currentTime = resume; }, { once: true });
+    // The server keeps the position, so the app on a phone can continue from here, and the other way round.
+    const resume = api(`/api/notes/${n.id}/position`).then(r => r.secs).catch(() => local.get(`pos:${n.id}`, 0));
+    audio.addEventListener("loadedmetadata", async () => {
+      const at = await resume;
+      if (state.playing?.id === n.id && at && at < audio.duration - 5) audio.currentTime = at;
+    }, { once: true });
     $("#p-title").textContent = n.title;
     navigator.mediaSession.metadata = new MediaMetadata({ title: n.title, artist: n.channel, album: "EasyNotes" });
   }
@@ -467,7 +471,7 @@ function syncPlayer() {
 }
 $("#p-play").onclick = togglePlay;
 $("#p-title").onclick = () => { if (state.playing) { state.route = { kind: "note", id: state.playing.id }; render(); } };
-$("#p-close").onclick = () => { audio.pause(); player.classList.remove("on"); state.playing = null; setPlayerH(); renderActions(); };
+$("#p-close").onclick = () => { if (state.playing && audio.currentTime && !audio.ended) savePosition(state.playing.id, audio.currentTime); audio.pause(); player.classList.remove("on"); state.playing = null; setPlayerH(); renderActions(); };
 $("#p-speed").onclick = async () => {
   const next = SPEEDS[(SPEEDS.indexOf(await local.get("speed", 1)) + 1) % SPEEDS.length];
   local.set("speed", next); audio.playbackRate = next; $("#p-speed").textContent = `${next}×`;
@@ -479,11 +483,16 @@ audio.addEventListener("play", syncPlayer);
 audio.addEventListener("pause", syncPlayer);
 audio.addEventListener("loadedmetadata", () => { $("#p-dur").textContent = clock(audio.duration); });
 let lastSave = 0;
+function savePosition(id, secs) {
+  local.set(`pos:${id}`, secs);
+  post(`/api/notes/${id}/position`, { secs }).catch(() => {});
+}
+audio.addEventListener("pause", () => { if (state.playing && audio.currentTime && !audio.ended) savePosition(state.playing.id, audio.currentTime); });
 audio.addEventListener("timeupdate", () => {
   if (!seeking && audio.duration) { $("#p-seek").value = audio.currentTime / audio.duration * 100; $("#p-cur").textContent = clock(audio.currentTime); }
-  if (state.playing && Date.now() - lastSave > 4000) { local.set(`pos:${state.playing.id}`, audio.currentTime); lastSave = Date.now(); }
+  if (state.playing && !audio.paused && Date.now() - lastSave > 5000) { savePosition(state.playing.id, audio.currentTime); lastSave = Date.now(); }
 });
-audio.addEventListener("ended", () => { if (state.playing) local.set(`pos:${state.playing.id}`, 0); syncPlayer(); });
+audio.addEventListener("ended", () => { if (state.playing) savePosition(state.playing.id, 0); syncPlayer(); });
 new ResizeObserver(setPlayerH).observe(player);
 
 // ---------- jobs ----------

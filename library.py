@@ -91,6 +91,28 @@ def drop_highlights(path, vid):
             save(path, data)
 
 
+def position_for(path, vid):
+    """Where the listener stopped in the audio of a note, in seconds."""
+    return load(path).get(vid, {}).get("secs", 0)
+
+
+def save_position(path, vid, secs):
+    """Keep the audio position on the server, so another device can resume from it."""
+    secs = max(0.0, float(secs))
+    with LOCK:
+        data = load(path)
+        data[vid] = {"secs": round(secs, 1), "at": datetime.now().isoformat(timespec="seconds")}
+        save(path, data)
+    return secs
+
+
+def drop_position(path, vid):
+    with LOCK:
+        data = load(path)
+        if data.pop(vid, None) is not None:
+            save(path, data)
+
+
 def yaml_string(text):
     # A JSON string is also a valid YAML double-quoted scalar.
     return json.dumps(str(text), ensure_ascii=False)
