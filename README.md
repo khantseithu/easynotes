@@ -15,7 +15,7 @@ Each note has these parts:
 
 When a process, a cycle or a system is easier to understand as a picture, the note also has a diagram. The model writes the diagram in [Mermaid](https://mermaid.js.org) text, and [Pele](https://pele.run) draws it in the app and in the Chrome extension. The diagram uses the colors of the light or dark theme. If Pele can't read a diagram, the app shows its Mermaid text instead. Audio versions skip diagrams.
 
-English notes use plain English. The app gives the writing rules of the [simple-english](https://github.com/AminBlg/SimpleEnglish) skill to the model. Sentences are short, verbs are active, and the notes have no filler words.
+Notes use a spoken tone. They read like a friend who watched the video and explains it to you out loud: everyday words, short sentences, and no filler. Burmese notes use spoken Burmese, not formal written Burmese.
 
 Burmese videos and articles get Burmese notes. Audio is unavailable for Burmese notes because the current Kokoro voices do not support Burmese.
 
@@ -151,7 +151,7 @@ The app makes a note in these steps:
 
 1. yt-dlp gets the title, the channel, the length, the chapters, the description, and the captions of the video. For Burmese originals, it prefers Burmese captions; otherwise it prefers English and falls back to Burmese.
 2. If YouTube blocks the caption download, youtube-transcript-api gets the captions in a different way, in the same language.
-3. agy, pi, or Claude Code writes the notes from the chapters and the transcript. English notes follow the rules in `skills/simple-english/SKILL.md`. Burmese notes and glossary definitions use Burmese.
+3. agy, pi, or Claude Code writes the notes from the chapters and the transcript. Notes use a spoken tone. Burmese notes and glossary definitions use spoken Burmese.
 4. The app and the Chrome extension draw each `mermaid` code block in the note as a diagram with Pele. Pele loads only when a note has a diagram.
 5. For audio, `tts.py` changes the notes into a spoken script and Kokoro records it. ffmpeg then compresses the recording to an `.m4a` file.
 
@@ -171,7 +171,6 @@ The project has these files and folders:
 | `library.py` | Search, highlights, and the Markdown and flashcard exports. |
 | `context.py` | The code that gets chapters and reads article pages. |
 | `llm.py` | The code that sends prompts to agy, pi, or Claude Code. |
-| `skills/simple-english/` | A copy of the simple-english skill, with its license and source. |
 | `assets/` | The app icon in SVG and PNG. |
 | `extension/` | The Chrome extension. Its `vendor/` folder also has the copy of Pele that the app uses. |
 | `notes/` | Your notes, the audio files, `index.json`, and `collections.json`. Git ignores this folder. |
@@ -192,7 +191,6 @@ These are the errors that you can see, and what to do:
 EasyNotes uses work from these projects:
 
 - [pi](https://github.com/earendil-works/pi) and [Claude Code](https://claude.com/claude-code), which run the models.
-- [simple-english](https://github.com/AminBlg/SimpleEnglish) by AminBlg, MIT license. A copy is in `skills/simple-english/`.
 - [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), the [mlx-community](https://huggingface.co/mlx-community/Kokoro-82M-bf16) conversion, and [mlx-audio](https://github.com/Blaizzy/mlx-audio).
 - [Pele](https://github.com/obsidianmd/pele) by Obsidian, MIT license, which draws the diagrams. A copy is in `extension/vendor/`.
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api).
