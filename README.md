@@ -27,7 +27,7 @@ Tutorials get a different structure, so that you can follow along without watchi
 
 The app decides the kind of video by itself. To choose the structure yourself, use `--kind tutorial` or `--kind conversation`.
 
-English notes use plain English. The app gives the writing rules of the [simple-english](https://github.com/AminBlg/SimpleEnglish) skill to the model. Sentences are short, verbs are active, and the notes have no filler words.
+Notes use a spoken tone. They read like a friend who watched the video and explains it to you out loud: everyday words, short sentences, and no filler. Burmese notes use spoken Burmese, not formal written Burmese.
 
 Burmese videos and articles get Burmese notes. Audio is unavailable for Burmese notes because the current Kokoro voices do not support Burmese.
 
@@ -166,7 +166,7 @@ The app makes a note in these steps:
 2. If YouTube blocks the caption download, youtube-transcript-api gets the captions in a different way, in the same language.
 3. The model reads the title, the description, and the start of the transcript, and decides if the video is a conversation, a talk, or a tutorial.
 4. For a tutorial, `context.py` reads the GitHub repos, gists, and docs pages that the description links to. From a repo, it reads the README, the file list, and a few key files. The model then uses the real code instead of guessing it from speech.
-5. agy, pi, or Claude Code writes the notes from the chapters, the linked sources, and the transcript. English notes follow the rules in `skills/simple-english/SKILL.md`. Burmese notes and glossary definitions use Burmese.
+5. agy, pi, or Claude Code writes the notes from the chapters, the linked sources, and the transcript. The notes use a spoken tone. Burmese notes and glossary definitions use spoken Burmese.
 6. The app and the Chrome extension draw each `mermaid` code block in the note as a diagram with Pele. Pele loads only when a note has a diagram.
 7. For a tutorial, yt-dlp downloads the video at 720p or lower, and ffmpeg takes one frame for each step. The frames are in `notes/frames/`.
 8. For audio, `tts.py` changes the notes into a spoken script and Kokoro records it. ffmpeg then compresses the recording to an `.m4a` file.
@@ -188,7 +188,6 @@ The project has these files and folders:
 | `ROADMAP.md` | Ideas for improving tutorial notes. |
 | `context.py` | The code that gets chapters and reads the repos and docs that a video links to. |
 | `llm.py` | The code that sends prompts to agy, pi, or Claude Code. |
-| `skills/simple-english/` | A copy of the simple-english skill, with its license and source. |
 | `assets/` | The app icon in SVG and PNG. |
 | `extension/` | The Chrome extension. Its `vendor/` folder also has the copy of Pele that the app uses. |
 | `notes/` | Your notes, the audio files, `index.json`, and `collections.json`. Git ignores this folder. |
@@ -209,7 +208,6 @@ These are the errors that you can see, and what to do:
 EasyNotes uses work from these projects:
 
 - [pi](https://github.com/earendil-works/pi) and [Claude Code](https://claude.com/claude-code), which run the models.
-- [simple-english](https://github.com/AminBlg/SimpleEnglish) by AminBlg, MIT license. A copy is in `skills/simple-english/`.
 - [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), the [mlx-community](https://huggingface.co/mlx-community/Kokoro-82M-bf16) conversion, and [mlx-audio](https://github.com/Blaizzy/mlx-audio).
 - [Pele](https://github.com/obsidianmd/pele) by Obsidian, MIT license, which draws the diagrams. A copy is in `extension/vendor/`.
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api).
