@@ -49,7 +49,7 @@ export async function removeJob(id) {
 }
 
 export async function startJob(input, minutes, level, vid = null) {
-  const j = await post("/api/jobs", { input, minutes, level });
+  const j = await post("/api/jobs", { input, minutes, level, vid });
   const job = { id: j.id, vid, label: input, message: j.message, status: j.status, started: Date.now() };
   await addJob(job);
   return job;
