@@ -88,6 +88,14 @@ To remember a note, select Make flashcards below its title. The model reads the 
 
 Select Review at the top of the library to study every card that is due. Read the question, press Space to see the answer, and then grade yourself: 1 for Again, 2 for Good, or 3 for Easy. Cards that you know come back after a day, then three days, then less and less often. Cards that you miss come back in the same session. Your cards are saved on your Mac in `notes/flashcards.json`.
 
+## Quiz and questions
+
+To check what you understood, select Quiz me at the end of a note. The model writes a few multiple-choice questions about the note. Select an answer to see if it is right and why. Select Try again to answer the same questions again, or New questions to get a different set.
+
+To ask about something that is unclear, type a question under Ask about this note. The answer uses the note first. If the note does not cover the question, the answer says so before it uses general knowledge. Burmese notes get Burmese questions and answers.
+
+Quizzes and questions are saved on your Mac in `notes/learn.json`.
+
 ## Today: a daily watch list
 
 Today is a short list of new videos that are worth your time. It uses only the channels that you choose, so YouTube's recommendations do not decide what you see.
@@ -187,6 +195,7 @@ The project has these files and folders:
 | `daily.py` | The daily watch list: your channels, their RSS feeds, and the picks. |
 | `events.py` | The live updates that the server sends to each open app. |
 | `library.py` | Search, highlights, and the Markdown and flashcard exports. |
+| `learn.py` | Quizzes and questions about a note. |
 | `context.py` | The code that gets chapters and reads article pages. |
 | `llm.py` | The code that sends prompts to agy, pi, or Claude Code. |
 | `assets/` | The app icon in SVG and PNG. |

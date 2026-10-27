@@ -21,6 +21,7 @@ from urllib.parse import parse_qs, quote, urlparse
 import context
 import daily
 import events
+import learn
 import library
 import llm
 import transcript
@@ -32,6 +33,7 @@ INDEX = NOTES / "index.json"
 COLLECTIONS = NOTES / "collections.json"
 HIGHLIGHTS = NOTES / "highlights.json"
 FLASHCARDS = NOTES / "flashcards.json"
+LEARN = NOTES / "learn.json"
 FRAMES = NOTES / "frames"
 MAX_PLAYLIST = 50
 SKIP_LISTS = ("RD", "WL", "LL", "UL")
@@ -483,6 +485,7 @@ def delete_note(vid):
             COLLECTIONS.write_text(json.dumps(cols, indent=2, ensure_ascii=False))
     library.drop_highlights(HIGHLIGHTS, vid)
     library.drop_cards(FLASHCARDS, vid)
+    learn.drop_note(LEARN, vid)
     for ext in ("md", "m4a"):
         (NOTES / f"{vid}.{ext}").unlink(missing_ok=True)
     BUS.publish("notes", {"id": vid, "deleted": True})
@@ -511,6 +514,66 @@ def make_flashcards(vid, model):
     if not pairs:
         raise RuntimeError("The model did not write any flashcards. Try again.")
     return library.set_cards(FLASHCARDS, vid, pairs, datetime.now().date())
+
+
+def note_meta(vid):
+    return next((n for n in load_index() if n["id"] == vid), None)
+
+
+def learning_rules(language):
+    return learn.BURMESE_RULES if language == "my" else "Write in plain English, with short sentences and everyday words."
+
+
+def model_failure(out, what):
+    reason = (out.stderr.strip() or out.stdout.strip()).splitlines()
+    return RuntimeError(f"{what} failed: {reason[-1][:200]}" if reason else f"{what} failed")
+
+
+def make_quiz(vid, model):
+    meta = note_meta(vid)
+    if not meta:
+        raise RuntimeError("Note not found")
+    language = meta.get("language", "en")
+    prompt = learn.quiz_prompt(meta, learning_rules(language))
+    for attempt in range(2):
+        out = llm.run(prompt, llm.model_for_language(language, model), note_text(vid), timeout=300)
+        if out.returncode != 0:
+            raise model_failure(out, "Quiz")
+        try:
+            quiz = learn.save_quiz(LEARN, vid, learn.parse_quiz(out.stdout))
+            BUS.publish("learn", {"id": vid})
+            return quiz
+        except ValueError:
+            if attempt:
+                raise RuntimeError("Quiz failed: the model did not write usable questions. Try again.")
+
+
+def ask_note(vid, question, model):
+    meta = note_meta(vid)
+    if not meta:
+        raise RuntimeError("Note not found")
+    language = meta.get("language", "en")
+    text = learn.chat_input(note_text(vid), learn.chat_for(LEARN, vid), question)
+    out = llm.run(learn.chat_prompt(meta, learning_rules(language)), llm.model_for_language(language, model), text, timeout=300)
+    if out.returncode != 0 or not out.stdout.strip():
+        raise model_failure(out, "Answer")
+    chat = learn.add_chat(LEARN, vid, {"role": "user", "text": question}, {"role": "assistant", "text": out.stdout.strip()})
+    BUS.publish("learn", {"id": vid})
+    return chat
+
+
+def start_task(kind, message, fn, *args):
+    """Run a model call in the background. Phones drop requests that wait too long, so the app follows the job."""
+    job_id = uuid.uuid4().hex[:12]
+    job = JOBS[job_id] = events.Job(BUS, id=job_id, kind=kind, status="running", message=message, ids=[])
+
+    def run():
+        try:
+            job.update(status="done", result=fn(*args), message="Done")
+        except Exception as e:
+            job.update(status="error", message=str(e))
+    threading.Thread(target=run, daemon=True).start()
+    return job
 
 
 def add_glossary(vid, model):
@@ -838,7 +901,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, {**meta, "markdown": note_text(meta["id"]),
                                    "highlights": library.highlights_for(HIGHLIGHTS, meta["id"]),
                                    "flashcards": len(library.load(FLASHCARDS).get(meta["id"], [])),
-                                   "collections": note_collections(meta["id"])})
+                                   "collections": note_collections(meta["id"]),
+                                   "quiz": learn.quiz_for(LEARN, meta["id"]),
+                                   "chat": learn.chat_for(LEARN, meta["id"])})
         if self.path == "/api/flashcards":
             return self.send(200, library.due_cards(FLASHCARDS, load_index(), datetime.now().date(),
                                                     query.get("note", [None])[0]))
@@ -878,6 +943,21 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(400, {"error": str(e)})
             BUS.publish("highlights", {"id": m.group(1)})
             return self.send(201, item)
+        m = re.fullmatch(r"/api/notes/([\w-]{11})/(quiz|chat)", self.path)
+        if m and not note_meta(m.group(1)):
+            return self.send(404, {"error": "not found"})
+        if m and m.group(2) == "quiz":
+            quiz = learn.quiz_for(LEARN, m.group(1))
+            if quiz and not body.get("fresh"):
+                return self.send(200, quiz)
+            return self.send(202, start_task("quiz", "Writing questions…", make_quiz, m.group(1), self.model))
+        if m and m.group(2) == "chat":
+            question = " ".join(str(body.get("question") or "").split())
+            if not question:
+                return self.send(400, {"error": "Type a question"})
+            if len(question) > learn.MAX_QUESTION:
+                return self.send(400, {"error": f"Keep the question under {learn.MAX_QUESTION} characters"})
+            return self.send(202, start_task("chat", "Thinking…", ask_note, m.group(1), question, self.model))
         m = re.fullmatch(r"/api/notes/([\w-]{11})/flashcards", self.path)
         if m:
             try:
@@ -927,6 +1007,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send(202, JOBS[job_id])
 
     def do_DELETE(self):
+        m = re.fullmatch(r"/api/notes/([\w-]{11})/chat", urlparse(self.path).path)
+        if m:
+            learn.clear_chat(LEARN, m.group(1))
+            BUS.publish("learn", {"id": m.group(1)})
+            return self.send(200, {"id": m.group(1), "chat": []})
         m = re.fullmatch(r"/api/sources/(UC[\w-]{22})", urlparse(self.path).path)
         if m:
             if not DAILY.remove(m.group(1)):
