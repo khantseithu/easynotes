@@ -1287,8 +1287,7 @@ async function record(n) {
   try {
     let job = await api(`/api/audio/${n.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ voice }) });
     while (job.status === "running") {
-      await new Promise(r => setTimeout(r, 800));
-      job = await api(`/api/jobs/${job.id}`);
+      job = await nextJob(job, 800);
       const pct = +(job.message.match(/(\d+)%/) || [])[1] || 0;
       if (state.current === n.id) renderActions(job.message.replace(/…?\s*\d+%/, "").replace(/…$/, "") + (pct ? ` ${pct}%` : "…"), null, pct);
     }
@@ -1391,11 +1390,13 @@ async function resumeJobs() {
 }
 async function runJob(job, first, stay) {
   try {
-    let j = await first();
+    let j;
+    live.starting++;
+    try { j = await first(); } finally { live.starting--; }
+    job.id = j.id;
     let shown = j.ids?.length || 0;
     while (j.status === "running") {
-      await new Promise(r => setTimeout(r, 1500));
-      j = await api(`/api/jobs/${j.id}`);
+      j = await nextJob(j, 1500);
       Object.assign(job, { message: j.message, title: j.title, total: j.total, done: j.done });
       const colId = j.collections?.[0];
       if (colId && !job.opened) { job.opened = true; await loadCollections(); openCollection(colId); }
@@ -1495,10 +1496,9 @@ async function openToday(quiet) {
 async function pollDaily(id) {
   if (state.dailyPoll === id) return;
   state.dailyPoll = id;
-  let j = { status: "running" };
+  let j = { id, status: "running" };
   while (j.status === "running") {
-    await new Promise(r => setTimeout(r, 2000));
-    try { j = await api(`/api/jobs/${id}`); } catch { break; }
+    try { j = await nextJob(j, 2000); } catch { break; }
     if (state.daily?.job) { state.daily.job.message = j.message; todayMeta(); }
     if (state.current === "today") { const st = $("#view .st"); if (st && j.status === "running") st.lastChild.textContent = j.message; }
   }
@@ -1534,6 +1534,112 @@ $("#view").addEventListener("click", async e => {
   else if (e.target.closest("#src-seed")) sourcesCall({ body: { seed: true } }, "Finding the channels of your notes…");
   else if (e.target.closest("#daily-run")) { await api("/api/daily", { method: "POST" }); openToday(true); }
 });
+
+// ---------- live updates ----------
+// The server pushes each change as a Server-Sent Event, so jobs, notes and the Today list update without
+// polling, and a change on one device or tab shows on the others. Without the stream, the app polls as before.
+const live = { on: false, jobs: {}, waiters: {}, starting: 0, kinds: new Set(), notes: new Set(), marks: new Set(), timer: null };
+const newer = (a, b) => (b?.seq || 0) > (a?.seq || 0) ? b : a;
+
+// The job's next state: pushed by the server, or fetched when the stream is down or quiet for a while.
+function nextJob(j, ms) {
+  const known = live.jobs[j.id];
+  if ((known?.seq || 0) > (j.seq || 0)) return Promise.resolve(known);
+  return new Promise((resolve, reject) => {
+    const waiter = x => { clearTimeout(timer); resolve(x); };
+    const timer = setTimeout(() => {
+      live.waiters[j.id]?.delete(waiter);
+      api(`/api/jobs/${j.id}`).then(x => resolve(newer(x, live.jobs[j.id])), reject);
+    }, live.on ? 10000 : ms);
+    (live.waiters[j.id] ??= new Set()).add(waiter);
+  });
+}
+
+function onJob(j) {
+  if ((live.jobs[j.id]?.seq || 0) >= j.seq) return;
+  live.jobs[j.id] = j;
+  const waiters = live.waiters[j.id];
+  delete live.waiters[j.id];
+  waiters?.forEach(f => f(j));
+  if (j.status !== "running") return;
+  // Jobs started in another tab or on another device show here too.
+  if (j.kind === "notes" && !live.starting && !state.jobs.some(x => x.id === j.id)) {
+    const job = { id: j.id, label: j.label, message: j.message, status: "running", vid: j.vid, title: j.title, total: j.total, done: j.done, opened: true };
+    state.jobs.push(job);
+    renderList();
+    runJob(job, async () => j, true);
+  }
+  if (j.kind === "daily" && state.dailyPoll !== j.id) {
+    pollDaily(j.id);
+    loadDaily().then(() => { if (state.current === "today") openToday(true); }).catch(() => {});
+  }
+}
+
+// Changes come in bursts, so wait a moment and then reload each kind of data once.
+function onChange(kind, d) {
+  live.kinds.add(kind);
+  if (kind === "notes") live.notes.add(d.id);
+  if (kind === "highlights") live.marks.add(d.id);
+  clearTimeout(live.timer);
+  live.timer = setTimeout(syncLive, 250);
+}
+
+async function syncLive() {
+  const kinds = new Set(live.kinds), notes = new Set(live.notes), marks = new Set(live.marks);
+  [live.kinds, live.notes, live.marks].forEach(x => x.clear());
+  try {
+    await Promise.all([
+      kinds.has("notes") ? loadNotes() : null,
+      kinds.has("notes") || kinds.has("collections") ? loadCollections() : null,
+      kinds.has("daily") ? loadDaily() : null,
+    ]);
+  } catch { return; }
+  const cur = state.current;
+  if (cur === "today" && (kinds.has("daily") || state.daily?.picks.some(p => notes.has(p.id)))) return openToday(true);
+  if (cur?.startsWith("c:") && (kinds.has("notes") || kinds.has("collections"))) return openCollection(cur.slice(2), true);
+  const n = state.note;
+  if (!n || n.id !== cur) return;
+  const meta = state.notes.find(x => x.id === n.id);
+  if (!meta) {
+    // Deleted in another tab or on another device.
+    if (state.playing === n.id) $("#p-close").click();
+    const col = n.collections?.[0];
+    return col ? openCollection(col.id) : state.notes.length ? openNote(state.notes[0].id) : welcome();
+  }
+  if (notes.has(n.id)) {
+    if (meta.created !== n.created) return openNote(n.id);  // Written again, for example as Detailed notes.
+    if (meta.read_at !== n.read_at || JSON.stringify(meta.audio) !== JSON.stringify(n.audio)) {
+      state.note = { ...n, read_at: meta.read_at, audio: meta.audio };
+      renderActions();
+    }
+  }
+  if (marks.has(n.id)) {
+    const fresh = await api(`/api/notes/${n.id}`).catch(() => null);
+    if (!fresh || state.note?.id !== n.id) return;
+    state.note.highlights = fresh.highlights;
+    document.querySelectorAll("mark.hl").forEach(m => m.replaceWith(...m.childNodes));
+    fresh.highlights.forEach(h => markText($("#md"), h.quote, h.id));
+    renderHighlights();
+  }
+}
+
+// After the stream drops, for example when the server restarts, anything can have changed.
+function resyncLive() {
+  ["notes", "collections", "daily"].forEach(kind => live.kinds.add(kind));
+  if (state.note) { live.notes.add(state.note.id); live.marks.add(state.note.id); }
+  clearTimeout(live.timer);
+  live.timer = setTimeout(syncLive, 0);
+}
+
+function connectLive() {
+  if (!("EventSource" in window)) return;
+  const es = new EventSource("/api/events");
+  let opened = false;
+  es.onopen = () => { live.on = true; if (opened) resyncLive(); opened = true; };
+  es.onerror = () => { live.on = false; };
+  es.addEventListener("job", e => onJob(JSON.parse(e.data)));
+  ["notes", "highlights", "collections", "daily"].forEach(kind => es.addEventListener(kind, e => onChange(kind, JSON.parse(e.data))));
+}
 
 async function makeCards(n) {
   state.cardsBusy = n.id;
@@ -1625,6 +1731,7 @@ renderSeg();
 $("#p-speed").textContent = `${store.get("speed", 1)}×`;
 $("#unread-only").setAttribute("aria-pressed", state.unreadOnly);
 syncPlayer();
+connectLive();
 Promise.all([api("/api/voices").then(v => { state.voices = v; }), loadNotes(), loadCollections(), loadDaily().catch(() => null), loadDue().catch(() => null), resumeJobs().catch(() => null)]).then(() => {
   if (route()) return;
   if (state.daily?.sources.length) openToday();
