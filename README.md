@@ -56,6 +56,8 @@ To read several videos, paste one link on each line. Press Shift+Enter to start 
 
 If you paste a playlist link, the app reads the first 50 videos of the playlist. A playlist link contains `/playlist?list=`. A video link that also contains `list=` gives only that video.
 
+Select Normal or Detailed under the box to choose how much the notes keep. Detailed notes cover every idea, example and step, so they are about two to three times longer. Asking for Detailed notes on a video that has Normal notes writes them again.
+
 If you type a topic instead of a link, the app finds the best videos about the topic. Select how much video it covers, from 30 minutes to 4 hours. The app then writes one note for each video.
 
 Each playlist and each topic becomes a collection in the library. A collection page shows each video with its TL;DR, in playlist order. Each note in a collection has links to the previous and the next video.
@@ -121,6 +123,7 @@ You can also use EasyNotes without the browser. Each command saves its result in
 | `python3 ytnotes.py "https://youtu.be/ID_1" "https://youtu.be/ID_2"` | Writes notes for each video. |
 | `python3 ytnotes.py "https://www.youtube.com/playlist?list=PLAYLIST_ID"` | Writes notes for the first 50 videos of a playlist and saves the playlist as a collection. |
 | `python3 ytnotes.py "saas distribution" -t 60` | Writes notes for the best videos on a topic, about 60 minutes of video in total. |
+| `python3 ytnotes.py "https://youtu.be/VIDEO_ID" --level detailed` | Writes detailed notes that cover every idea, example and step. |
 | `python3 ytnotes.py "https://youtu.be/VIDEO_ID" --audio --voice bm_george` | Writes notes and records the audio in the voice that you select. |
 | `python3 ytnotes.py --daily` | Makes today's watch list from your channels and prints it. |
 | `python3 ytnotes.py --add-glossary` | Adds a glossary to old notes that do not have one. |

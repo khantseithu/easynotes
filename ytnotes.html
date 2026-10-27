@@ -451,6 +451,13 @@ mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color
       </div>
       <span>of video</span>
     </div>
+    <div class="topic-row" id="level-row">
+      <span>Notes</span>
+      <div class="seg" role="group" aria-label="How detailed the notes are">
+        <button type="button" data-level="normal">Normal</button>
+        <button type="button" data-level="detailed">Detailed</button>
+      </div>
+    </div>
     <p class="hint" id="hint" aria-live="polite"></p>
   </form>
   <div class="today-nav"><button class="item" id="today-btn" aria-current="false"><div class="t">Today</div><div class="m" id="today-meta">New videos worth watching</div></button></div>
@@ -542,7 +549,7 @@ const ICON = {
 const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
 const EXAMPLES = ["saas distribution", "founder-led sales", "pricing strategy", "product-led growth"];
 
-const state = { notes: [], collections: [], voices: [], current: null, note: null, jobs: [], minutes: store.get("minutes", 60), q: "", playing: null, expandedFolders: store.get("expandedFolders", {}), expandedChannels: store.get("expandedChannels", {}), folderOrder: store.get("folderOrder", []), noteOrder: store.get("noteOrder", []), pinnedItems: store.get("pinnedItems", []), unreadOnly: store.get("unreadOnly", false), hits: [] };
+const state = { notes: [], collections: [], voices: [], current: null, note: null, jobs: [], minutes: store.get("minutes", 60), level: store.get("level", "normal"), q: "", playing: null, expandedFolders: store.get("expandedFolders", {}), expandedChannels: store.get("expandedChannels", {}), folderOrder: store.get("folderOrder", []), noteOrder: store.get("noteOrder", []), pinnedItems: store.get("pinnedItems", []), unreadOnly: store.get("unreadOnly", false), hits: [] };
 
 function applyTheme() {
   const t = store.get("theme", "system");
@@ -562,9 +569,11 @@ document.addEventListener("keydown", e => {
 });
 
 function renderSeg() {
-  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.min === state.minutes)));
+  document.querySelectorAll(".seg [data-min]").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.min === state.minutes)));
+  document.querySelectorAll(".seg [data-level]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.level === state.level)));
 }
-document.querySelector(".seg").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.minutes = +b.dataset.min; store.set("minutes", state.minutes); renderSeg(); };
+document.querySelector("#topic-row .seg").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.minutes = +b.dataset.min; store.set("minutes", state.minutes); renderSeg(); };
+document.querySelector("#level-row .seg").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.level = b.dataset.level; store.set("level", state.level); renderSeg(); };
 $("#in").addEventListener("input", () => {
   const el = $("#in"), v = el.value.trim();
   el.style.height = "";
@@ -572,6 +581,7 @@ $("#in").addEventListener("input", () => {
   el.style.overflowY = v && el.scrollHeight > 160 ? "auto" : "hidden";
   $("#go").disabled = !v;
   $("#topic-row").classList.toggle("on", !!v && !hasLink(v));
+  $("#level-row").classList.toggle("on", !!v);
   const d = describeInput(v);
   $("#hint").textContent = d && (d.includes(" and ") || /playlist|\d+ videos/.test(d)) ? `Notes for ${d}` : "";
   $("#hint").className = "hint";
@@ -1355,7 +1365,7 @@ async function startJob(input, { label, stay, vid } = {}) {
   const job = { id: Math.random().toString(36).slice(2), label: label || input, message: "Starting…", status: "running", vid };
   state.jobs.unshift(job);
   renderList();
-  return runJob(job, () => api("/api/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input, minutes: state.minutes, label, vid }) }), stay);
+  return runJob(job, () => api("/api/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input, minutes: state.minutes, level: state.level, label, vid }) }), stay);
 }
 async function resumeJobs() {
   const running = await api("/api/jobs");

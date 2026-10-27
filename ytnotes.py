@@ -90,9 +90,15 @@ Concrete things to do, as "- [ ] ..." checkboxes.
 """ + DIAGRAM_RULE.format(where="Frameworks and multi-step key ideas are the usual places.", count="two diagrams",
                           first="TL;DR") + """
 
-Length should match the substance: about 300 words for a 10-minute video, up to about 1500 for a long interview.
+{length}
 Use only what is in the transcript, except glossary definitions, which may use general knowledge. Timestamps must come from the [mm:ss] markers in the transcript.
 Output only the notes."""
+LEVELS = ("normal", "detailed")
+VIDEO_LENGTH = {
+    "normal": "Length should match the substance: about 300 words for a 10-minute video, up to about 1500 for a long interview.",
+    "detailed": """Write detailed notes. Cover every idea, example, number and step the speaker gives, in the order they come, so nothing useful is lost.
+Length should match the substance: about 800 words for a 10-minute video, up to about 4000 for a long interview.""",
+}
 
 GLOSSARY_PROMPT = """The notes on stdin were written from a YouTube video. Write a glossary for them.
 
@@ -121,9 +127,9 @@ Write all explanatory prose in Burmese. Keep Latin text only for names, technica
     return "Write in English.\n" + SPOKEN_TONE + ENGLISH_TONE
 
 
-def notes_prompt(language):
+def notes_prompt(language, level="normal"):
     section = GLOSSARY_SECTION.format(language="Burmese" if language == "my" else "English")
-    prompt = NOTES_PROMPT.replace(GLOSSARY_SECTION.format(language="English"), section)
+    prompt = NOTES_PROMPT.replace(GLOSSARY_SECTION.format(language="English"), section).replace("{length}", VIDEO_LENGTH[level])
     return prompt + "\n\n" + output_language_rules(language)
 
 
@@ -287,9 +293,9 @@ def save_note(meta, body):
     return meta
 
 
-def make_notes(vid, model, log=print):
+def make_notes(vid, model, log=print, level="normal"):
     existing = next((n for n in load_index() if n["id"] == vid), None)
-    if existing and (NOTES / f"{vid}.md").exists():
+    if existing and (level == "normal" or existing.get("level") == level) and (NOTES / f"{vid}.md").exists():
         log(f"Already have notes for {existing['title']}")
         return existing
     with tempfile.TemporaryDirectory() as workdir:
@@ -305,7 +311,7 @@ def make_notes(vid, model, log=print):
     if extra["chapters"]:
         blocks.append("## Chapters\n" + "\n".join(f"[{stamp(t)}] {title}" for t, title in extra["chapters"]))
     fmt = {"title": meta["title"], "channel": meta["channel"], "duration": ytlearn.fmt_duration(meta["secs"])}
-    prompt = notes_prompt(meta.get("language", "en")).format(**fmt)
+    prompt = notes_prompt(meta.get("language", "en"), level).format(**fmt)
     if extra["chapters"]:
         prompt += "\nThe video's own chapters come before the transcript on stdin. Use them to group the key ideas."
     log(f"Writing notes: {meta['title']}")
@@ -318,13 +324,15 @@ def make_notes(vid, model, log=print):
         reason = (out.stderr.strip() or body).splitlines()[-1][:200] if (out.stderr.strip() or body) else "no output"
         raise RuntimeError(f"Notes failed for {meta['title']}: {reason}")
     body = clean_glossary(body)
+    if level != "normal":
+        meta["level"] = level
     return save_note(meta, link_stamps(body, vid))
 
 
-def make_article_notes(url, model, log=print):
+def make_article_notes(url, model, log=print, level="normal"):
     article_id = "a" + hashlib.sha256(url.encode()).hexdigest()[:10]
     existing = next((n for n in load_index() if n["id"] == article_id), None)
-    if existing and (NOTES / f"{article_id}.md").exists():
+    if existing and (level == "normal" or existing.get("level") == level) and (NOTES / f"{article_id}.md").exists():
         return existing
     log(f"Reading article: {url}")
     page = context.page_text(context.get(url))
@@ -345,7 +353,7 @@ Write markdown in exactly this structure:
 One sentence.
 
 ## Key ideas
-3 to 7 concrete, useful takeaways.
+{"Every main idea, in order, each with the details, examples and numbers that support it." if level == "detailed" else "3 to 7 concrete, useful takeaways."}
 
 ## Action items
 Concrete things to do, as "- [ ] ..." checkboxes. Omit if there are none.
@@ -364,6 +372,8 @@ Use only information in the article, except glossary definitions. Output only th
         raise RuntimeError(f"Article notes failed: {reason}")
     meta = {"id": article_id, "title": title, "channel": host.removeprefix("www."), "url": url,
             "secs": 0, "language": language, "kind": "article"}
+    if level != "normal":
+        meta["level"] = level
     return save_note(meta, result)
 
 
@@ -595,7 +605,7 @@ def topic_videos(topic, minutes, model):
     return ytlearn.rank(topic, pool, budget, 1, model) if pool else []
 
 
-def run_job(job, text, minutes, model):
+def run_job(job, text, minutes, model, level="normal"):
     def log(msg):
         job["message"] = msg
 
@@ -630,8 +640,8 @@ def run_job(job, text, minutes, model):
         def one(item):
             source_type, value = item
             try:
-                note = make_article_notes(value, model, log if len(work) == 1 else (lambda m: None)) if source_type == "article" \
-                    else make_notes(value, model, log if len(work) == 1 else (lambda m: None))
+                note = make_article_notes(value, model, log if len(work) == 1 else (lambda m: None), level) if source_type == "article" \
+                    else make_notes(value, model, log if len(work) == 1 else (lambda m: None), level)
                 done.append(note["id"])
             except Exception as e:
                 errors[value] = str(e)
@@ -843,7 +853,8 @@ class Handler(BaseHTTPRequestHandler):
         JOBS[job_id] = {"id": job_id, "status": "running", "message": "Starting…", "ids": [], "collections": [],
                         "title": None, "total": 0, "done": 0, "input": text, "label": body.get("label") or text,
                         "vid": body.get("vid")}
-        threading.Thread(target=run_job, args=(JOBS[job_id], text, int(body.get("minutes") or 60), self.model),
+        level = body.get("level") if body.get("level") in LEVELS else "normal"
+        threading.Thread(target=run_job, args=(JOBS[job_id], text, int(body.get("minutes") or 60), self.model, level),
                          daemon=True).start()
         self.send(202, JOBS[job_id])
 
@@ -880,6 +891,7 @@ def main():
     ap.add_argument("-t", "--time", type=int, default=60, help="minutes of video to cover for a topic")
     ap.add_argument("--model", default=None,
                     help=f"Gemini model (agy), pi model as provider/model (default: English {DEFAULT_MODEL}, Burmese {llm.BURMESE_MODEL}; explicit choice applies to both), or a Claude model such as claude-haiku-5-5")
+    ap.add_argument("--level", default="normal", choices=LEVELS, help="how much detail the notes keep")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true", help="don't open the browser")
     ap.add_argument("--lan", action="store_true", help="also serve on your local network, e.g. for your phone")
@@ -912,7 +924,7 @@ def main():
 
     if args.input:
         job = {"status": "running", "message": "", "ids": []}
-        run_job(job, "\n".join(args.input), args.time, args.model)
+        run_job(job, "\n".join(args.input), args.time, args.model, args.level)
         if job["status"] == "error":
             sys.exit(job["message"])
         for vid in job["ids"]:

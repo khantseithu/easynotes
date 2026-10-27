@@ -9,6 +9,7 @@ The extension uses the EasyNotes server on your Mac. It does not write notes its
 - When a video has notes, the side panel shows them. Select a timestamp to jump to that part of the video in the same tab.
 - While the video plays, a bar marks the key idea that the speaker talks about now.
 - When a video has no notes, select Make notes. The notes appear in the panel when they are ready.
+- Select Normal or Detailed before you make notes. Right-click Make notes uses the level that you selected last.
 - Select Listen to record and play the audio version, as in the app.
 - Glossary terms, action items, diagrams and the voice setting work as they do in the app.
 - Select the Library button to see all your notes, or to make notes from a link or a topic.

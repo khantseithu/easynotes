@@ -158,6 +158,9 @@ h1 { font-size: 21px; line-height: 1.22; letter-spacing: -0.018em; margin: 0 0 1
 .card { margin: 22px 0; }
 .card p { color: var(--muted); font-size: 14px; line-height: 1.55; margin: 0 0 14px; }
 .card code { font-size: 12.5px; background: var(--hover); padding: 2px 6px; border-radius: 5px; user-select: all; }
+.card .seg-row { margin: 0 0 10px; }
+.card .seg { flex: 1; padding: 3px; border-radius: 10px; }
+.card .seg button { flex: 1; height: 32px; border-radius: 8px; font-size: 13px; }
 .card .thumb { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; display: block; margin-bottom: 14px; background: var(--hover); }
 .progress { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); margin-top: 12px; }
 .sk { height: 13px; border-radius: 6px; background: var(--hover); margin: 13px 0; animation: pulse 1.2s ease-in-out infinite; }
