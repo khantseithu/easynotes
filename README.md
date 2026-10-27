@@ -15,19 +15,7 @@ Each note has these parts:
 
 When a process, a cycle or a system is easier to understand as a picture, the note also has a diagram. The model writes the diagram in [Mermaid](https://mermaid.js.org) text, and [Pele](https://pele.run) draws it in the app and in the Chrome extension. The diagram uses the colors of the light or dark theme. If Pele can't read a diagram, the app shows its Mermaid text instead. Audio versions skip diagrams.
 
-Tutorials get a different structure, so that you can follow along without watching the whole video:
-
-- The goal: what you build or learn.
-- The prerequisites: tools, versions and accounts.
-- Numbered steps, each with a link to its timestamp, a screenshot from the video, and the commands or code that it needs. Select a screenshot to watch that part of the video.
-- Gotchas: the errors and fixes that the presenter mentions.
-- The result, and what to try next.
-- The links from the video description.
-- A glossary.
-
-The app decides the kind of video by itself. To choose the structure yourself, use `--kind tutorial` or `--kind conversation`.
-
-English notes use plain English. The app gives the writing rules of the [simple-english](https://github.com/AminBlg/SimpleEnglish) skill to the model. Sentences are short, verbs are active, and the notes have no filler words.
+Notes use a spoken tone. They read like a friend who watched the video and explains it to you out loud: everyday words, short sentences, and no filler. Burmese notes use spoken Burmese, not formal written Burmese.
 
 Burmese videos and articles get Burmese notes. Audio is unavailable for Burmese notes because the current Kokoro voices do not support Burmese.
 
@@ -68,6 +56,8 @@ To read several videos, paste one link on each line. Press Shift+Enter to start 
 
 If you paste a playlist link, the app reads the first 50 videos of the playlist. A playlist link contains `/playlist?list=`. A video link that also contains `list=` gives only that video.
 
+Select Normal or Detailed under the box to choose how much the notes keep. Detailed notes cover every idea, example and step, so they are about two to three times longer. Asking for Detailed notes on a video that has Normal notes writes them again.
+
 If you type a topic instead of a link, the app finds the best videos about the topic. Select how much video it covers, from 30 minutes to 4 hours. The app then writes one note for each video.
 
 Each playlist and each topic becomes a collection in the library. A collection page shows each video with its TL;DR, in playlist order. Each note in a collection has links to the previous and the next video.
@@ -90,20 +80,21 @@ To take your notes elsewhere, use these downloads:
 
 - Export under a note saves that note as a Markdown file. The file has a short header with the title, the channel and the link, and it lists your highlights at the end. Obsidian and most other note apps can open it.
 - Export all in the library saves every note as a Markdown file in a zip file.
-- Flashcards in the library saves each glossary term as a row of a CSV file. In Anki, choose Import and select the file. The file has no header row, and each row has the term, its explanation, and the title of the note.
+- Flashcards in the library saves each glossary term and each AI flashcard as a row of a CSV file. In Anki, choose Import and select the file. The file has no header row, and each row has the term, its explanation, and the title of the note.
 
-## Quiz, review and questions
+## Flashcards
 
-Reading a note is the first step. These tools help you remember it.
+To remember a note, select Make flashcards below its title. The model reads the note and writes question and answer cards about its key ideas, frameworks and numbers. Then you study them right away.
 
-- Select Quiz me at the end of a note. The model writes a few multiple-choice questions about the note. Select an answer to see if it is right and why.
-- When you answer the last question, the questions and the glossary terms of the note go into Review.
-- Select Review at the top of the library to see the cards that are due today. A question card asks the question again. A term card shows the term. Think of what it means, select Show answer, and then select Forgot or Knew it.
-- A card comes back one day later at first. Each time that you remember it, the gap gets longer: 3 days, then about a week, then about three weeks. If you forget it, the card starts again at one day.
-- Select New questions under a quiz to get a different set. The old questions leave Review, and the glossary terms stay.
-- To ask about something that is unclear, type a question under Ask about this note. The answer uses the note first. If the note does not cover the question, the answer says so before it uses general knowledge.
+Select Review at the top of the library to study every card that is due. Read the question, press Space to see the answer, and then grade yourself: 1 for Again, 2 for Good, or 3 for Easy. Cards that you know come back after a day, then three days, then less and less often. Cards that you miss come back in the same session. Your cards are saved on your Mac in `notes/flashcards.json`.
 
-Quizzes, review cards and questions are saved on your Mac in `notes/learn.json`. Burmese notes get Burmese questions and answers.
+## Quiz and questions
+
+To check what you understood, select Quiz me at the end of a note. The model writes a few multiple-choice questions about the note. Select an answer to see if it is right and why. Select Try again to answer the same questions again, or New questions to get a different set.
+
+To ask about something that is unclear, type a question under Ask about this note. The answer uses the note first. If the note does not cover the question, the answer says so before it uses general knowledge. Burmese notes get Burmese questions and answers.
+
+Quizzes and questions are saved on your Mac in `notes/learn.json`.
 
 ## Today: a daily watch list
 
@@ -120,27 +111,15 @@ To make the list from the command line, run `python3 ytnotes.py --daily`. The fi
 
 ## Use the app on your phone
 
-At home, your phone and your Mac can be on the same Wi-Fi network. Start the server with the `--lan` flag:
+Your phone and your Mac must be on the same Wi-Fi network. Start the server with the `--lan` flag:
 
 ```bash
-python3 ytnotes.py --lan --password
+python3 ytnotes.py --lan
 ```
 
-The server asks you for a password, and then shows a second address, for example `http://192.168.1.117:8765`. Open that address on your phone and type the password once. The phone stays signed in for a year, or until you start the server with a different password. On an iPhone, select Share and then Add to Home Screen to get an app icon.
+The server shows a second address, for example `http://192.168.1.117:8765`. Open that address on your phone. On an iPhone, select Share and then Add to Home Screen to get an app icon.
 
-The Mac that runs the server never asks for the password. To set the password without typing it each time, use the `EASYNOTES_PASSWORD` environment variable. Without `--password`, each device on the network can open the app, so use `--lan` without a password only on a network that you trust.
-
-Read marks, highlights, quizzes, review cards and the audio position are saved on the server. When you stop listening on one device, Listen on the other device shows Resume at the same place.
-
-### Away from home
-
-To read and listen when you are not at home, use [Tailscale](https://tailscale.com). It makes a private network between your own devices, and the personal plan is free. Your Mac must stay on and run the server.
-
-1. Install Tailscale on your Mac and on your phone, and sign in to the same account on both.
-2. Start the server with `python3 ytnotes.py --lan --password`.
-3. The server shows a third address, for example `http://100.101.102.103:8765`. Open that address on your phone, on any network.
-
-Only your own devices can reach a Tailscale address, and the password protects the app if someone else gets one of them. Don't put the app on the public internet without a password. If you put it behind a proxy or a tunnel on the Mac, the proxy must send an `X-Forwarded-For` header, so that the app does not treat its requests as requests from the Mac.
+Use `--lan` only on a network that you trust. The app has no password, so each device on the network can open it.
 
 ## Use the Chrome extension
 
@@ -158,13 +137,12 @@ You can also use EasyNotes without the browser. Each command saves its result in
 | `python3 ytnotes.py "https://youtu.be/ID_1" "https://youtu.be/ID_2"` | Writes notes for each video. |
 | `python3 ytnotes.py "https://www.youtube.com/playlist?list=PLAYLIST_ID"` | Writes notes for the first 50 videos of a playlist and saves the playlist as a collection. |
 | `python3 ytnotes.py "saas distribution" -t 60` | Writes notes for the best videos on a topic, about 60 minutes of video in total. |
+| `python3 ytnotes.py "https://youtu.be/VIDEO_ID" --level detailed` | Writes detailed notes that cover every idea, example and step. |
 | `python3 ytnotes.py "https://youtu.be/VIDEO_ID" --audio --voice bm_george` | Writes notes and records the audio in the voice that you select. |
-| `python3 ytnotes.py "https://youtu.be/VIDEO_ID" --kind tutorial` | Writes notes with the tutorial structure. The choices are `auto` (the default), `conversation`, `talk`, and `tutorial`. |
 | `python3 ytnotes.py --daily` | Makes today's watch list from your channels and prints it. |
 | `python3 ytnotes.py --add-glossary` | Adds a glossary to old notes that do not have one. |
 | `python3 ytnotes.py --model openai-codex/gpt-6-luna` | Uses a different model. See the Choose a model section. |
 | `python3 ytnotes.py --port 8766` | Starts the server on a different port. |
-| `python3 ytnotes.py --lan --password` | Lets your phone open the app, and asks other devices for a password. |
 | `python3 ytlearn.py "saas distribution" -t 60` | Makes a playlist link with short takeaways in the `playlists/` folder. |
 
 The voices are `af_heart` (the default), `af_bella`, `am_michael`, `am_fenrir`, `bf_emma`, and `bm_george`. The letters `a` and `b` mean American and British. The letters `f` and `m` mean female and male.
@@ -190,12 +168,9 @@ The app makes a note in these steps:
 
 1. yt-dlp gets the title, the channel, the length, the chapters, the description, and the captions of the video. For Burmese originals, it prefers Burmese captions; otherwise it prefers English and falls back to Burmese.
 2. If YouTube blocks the caption download, youtube-transcript-api gets the captions in a different way, in the same language.
-3. The model reads the title, the description, and the start of the transcript, and decides if the video is a conversation, a talk, or a tutorial.
-4. For a tutorial, `context.py` reads the GitHub repos, gists, and docs pages that the description links to. From a repo, it reads the README, the file list, and a few key files. The model then uses the real code instead of guessing it from speech.
-5. agy, pi, or Claude Code writes the notes from the chapters, the linked sources, and the transcript. English notes follow the rules in `skills/simple-english/SKILL.md`. Burmese notes and glossary definitions use Burmese.
-6. The app and the Chrome extension draw each `mermaid` code block in the note as a diagram with Pele. Pele loads only when a note has a diagram.
-7. For a tutorial, yt-dlp downloads the video at 720p or lower, and ffmpeg takes one frame for each step. The frames are in `notes/frames/`.
-8. For audio, `tts.py` changes the notes into a spoken script and Kokoro records it. ffmpeg then compresses the recording to an `.m4a` file.
+3. agy, pi, or Claude Code writes the notes from the chapters and the transcript. Notes use a spoken tone. Burmese notes and glossary definitions use spoken Burmese.
+4. The app and the Chrome extension draw each `mermaid` code block in the note as a diagram with Pele. Pele loads only when a note has a diagram.
+5. For audio, `tts.py` changes the notes into a spoken script and Kokoro records it. ffmpeg then compresses the recording to an `.m4a` file.
 
 Before saving Burmese output, the app checks for unrelated foreign scripts and editing remarks. It allows foreign names that appear in the source, and Latin technical terms. If the check fails, it asks the model to repair the output once. If that repair still fails, the app reports an error instead of saving the text.
 
@@ -210,17 +185,13 @@ The project has these files and folders:
 | `tts.py` | The script that records audio with Kokoro. |
 | `ytlearn.py` | The video search and the playlist builder. |
 | `daily.py` | The daily watch list: your channels, their RSS feeds, and the picks. |
-| `library.py` | Search, highlights, the audio position, and the Markdown and flashcard exports. |
-| `learn.py` | Quizzes, review cards and their schedule, and questions about a note. |
-| `access.py` | The password for other devices. |
-| `login.html` | The sign-in page that other devices see when the server has a password. |
-| `ROADMAP.md` | Ideas for improving tutorial notes. |
-| `context.py` | The code that gets chapters and reads the repos and docs that a video links to. |
+| `library.py` | Search, highlights, and the Markdown and flashcard exports. |
+| `learn.py` | Quizzes and questions about a note. |
+| `context.py` | The code that gets chapters and reads article pages. |
 | `llm.py` | The code that sends prompts to agy, pi, or Claude Code. |
-| `skills/simple-english/` | A copy of the simple-english skill, with its license and source. |
 | `assets/` | The app icon in SVG and PNG. |
 | `extension/` | The Chrome extension. Its `vendor/` folder also has the copy of Pele that the app uses. |
-| `notes/` | Your notes, the audio files, `index.json`, `collections.json`, `highlights.json`, `positions.json`, and `learn.json`. Git ignores this folder. |
+| `notes/` | Your notes, the audio files, `index.json`, and `collections.json`. Git ignores this folder. |
 | `playlists/` | The playlists from `ytlearn.py`. Git ignores this folder. |
 
 ## Troubleshooting
@@ -238,7 +209,6 @@ These are the errors that you can see, and what to do:
 EasyNotes uses work from these projects:
 
 - [pi](https://github.com/earendil-works/pi) and [Claude Code](https://claude.com/claude-code), which run the models.
-- [simple-english](https://github.com/AminBlg/SimpleEnglish) by AminBlg, MIT license. A copy is in `skills/simple-english/`.
 - [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), the [mlx-community](https://huggingface.co/mlx-community/Kokoro-82M-bf16) conversion, and [mlx-audio](https://github.com/Blaizzy/mlx-audio).
 - [Pele](https://github.com/obsidianmd/pele) by Obsidian, MIT license, which draws the diagrams. A copy is in `extension/vendor/`.
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api).

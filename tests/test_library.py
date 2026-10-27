@@ -105,32 +105,6 @@ class HighlightTests(unittest.TestCase):
         self.assertEqual(json.loads(self.path.read_text()).keys(), {"bbbbbbbbbbb"})
 
 
-class PositionTests(unittest.TestCase):
-    def setUp(self):
-        self.dir = tempfile.TemporaryDirectory()
-        self.path = Path(self.dir.name) / "positions.json"
-
-    def tearDown(self):
-        self.dir.cleanup()
-
-    def test_save_and_read_the_audio_position(self):
-        self.assertEqual(library.position_for(self.path, "aaaaaaaaaaa"), 0)
-        library.save_position(self.path, "aaaaaaaaaaa", "754.26")
-        self.assertEqual(library.position_for(self.path, "aaaaaaaaaaa"), 754.3)
-        library.save_position(self.path, "aaaaaaaaaaa", -3)
-        self.assertEqual(library.position_for(self.path, "aaaaaaaaaaa"), 0)
-
-    def test_rejects_a_position_that_is_not_a_number(self):
-        with self.assertRaises(ValueError):
-            library.save_position(self.path, "aaaaaaaaaaa", "soon")
-
-    def test_drop_position(self):
-        library.save_position(self.path, "aaaaaaaaaaa", 10)
-        library.save_position(self.path, "bbbbbbbbbbb", 20)
-        library.drop_position(self.path, "aaaaaaaaaaa")
-        self.assertEqual(json.loads(self.path.read_text()).keys(), {"bbbbbbbbbbb"})
-
-
 class ExportTests(unittest.TestCase):
     def test_note_markdown_has_front_matter_and_highlights(self):
         meta = {"title": 'Say "hi": a note', "channel": "Acme", "created": "2026-01-02T10:00:00"}

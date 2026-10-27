@@ -9,6 +9,7 @@ The extension uses the EasyNotes server on your Mac. It does not write notes its
 - When a video has notes, the side panel shows them. Select a timestamp to jump to that part of the video in the same tab.
 - While the video plays, a bar marks the key idea that the speaker talks about now.
 - When a video has no notes, select Make notes. The notes appear in the panel when they are ready.
+- Select Normal or Detailed before you make notes. Right-click Make notes uses the level that you selected last.
 - Select Listen to record and play the audio version, as in the app.
 - Glossary terms, action items, diagrams and the voice setting work as they do in the app.
 - Select the Library button to see all your notes, or to make notes from a link or a topic.
@@ -26,7 +27,7 @@ After you change a file in this folder, select the reload button for EasyNotes o
 
 ## Settings
 
-The extension connects to `http://127.0.0.1:8765` by default. To use a different port or a server on another computer, open the extension's Settings from the gear button in the panel. For a server on another computer, start it with `--lan` and type the address that it shows. Chrome asks you to allow the extension to reach that address. If that server has a password, the extension can't sign in, so use the extension on the Mac that runs the server.
+The extension connects to `http://127.0.0.1:8765` by default. To use a different port or a server on another computer, open the extension's Settings from the gear button in the panel. For a server on another computer, start it with `--lan` and type the address that it shows. Chrome asks you to allow the extension to reach that address.
 
 ## Files
 

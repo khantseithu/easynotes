@@ -6,10 +6,12 @@ import re
 import threading
 import uuid
 import zipfile
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 LOCK = threading.Lock()
 MAX_TEXT = 2000
+CARD_LINE = re.compile(r"^[\s*-]*([QA])\**\s*:\**\s*(.+?)\s*$")
+GRADES = ("again", "good", "easy")
 GLOSSARY_LINE = re.compile(r"^-\s+\*\*(.+?)\*\*\s*(?:\(([^)]*)\))?\s*:?\s*(.*)$")
 
 
@@ -91,26 +93,77 @@ def drop_highlights(path, vid):
             save(path, data)
 
 
-def position_for(path, vid):
-    """Where the listener stopped in the audio of a note, in seconds."""
-    return load(path).get(vid, {}).get("secs", 0)
+def parse_cards(text):
+    """The (question, answer) pairs of model output written as "Q: ..." and "A: ..." lines."""
+    cards, question = [], None
+    for line in text.splitlines():
+        m = CARD_LINE.match(line)
+        if not m:
+            continue
+        if m.group(1) == "Q":
+            question = m.group(2)
+        elif question:
+            cards.append((question, m.group(2)))
+            question = None
+    return cards
 
 
-def save_position(path, vid, secs):
-    """Keep the audio position on the server, so another device can resume from it."""
-    secs = max(0.0, float(secs))
+def set_cards(path, vid, pairs, today):
+    cards = [{"id": uuid.uuid4().hex[:8], "q": q, "a": a, "due": today.isoformat(), "interval": 0, "ease": 2.5, "reps": 0}
+             for q, a in pairs]
     with LOCK:
         data = load(path)
-        data[vid] = {"secs": round(secs, 1), "at": datetime.now().isoformat(timespec="seconds")}
+        data[vid] = cards
         save(path, data)
-    return secs
+    return cards
 
 
-def drop_position(path, vid):
+def drop_cards(path, vid):
+    drop_highlights(path, vid)
+
+
+def schedule(card, grade, today):
+    """Spaced repetition: each correct answer pushes the card further out, a miss brings it back today."""
+    interval, ease, reps = card["interval"], card["ease"], card["reps"]
+    if grade == "again":
+        interval, ease, reps = 0, max(1.3, ease - 0.2), 0
+    else:
+        interval = 1 if reps == 0 else 3 if reps == 1 else round(interval * ease)
+        if grade == "easy":
+            interval, ease = max(4, round(interval * 1.3)), ease + 0.15
+        reps += 1
+    return {**card, "interval": interval, "ease": round(ease, 2), "reps": reps,
+            "due": (today + timedelta(days=interval)).isoformat()}
+
+
+def review_card(path, vid, cid, grade, today):
+    if grade not in GRADES:
+        raise ValueError("Grade the card as again, good or easy")
     with LOCK:
         data = load(path)
-        if data.pop(vid, None) is not None:
-            save(path, data)
+        cards = data.get(vid, [])
+        i = next((i for i, c in enumerate(cards) if c["id"] == cid), None)
+        if i is None:
+            return None
+        cards[i] = schedule(cards[i], grade, today)
+        save(path, data)
+    return cards[i]
+
+
+def due_cards(path, notes, today, vid=None):
+    """The cards due by today, oldest first, each with the note it came from, and the next date after them."""
+    titles = {n["id"]: n["title"] for n in notes}
+    due, later = [], []
+    for note_id, cards in load(path).items():
+        if note_id not in titles or vid and note_id != vid:
+            continue
+        for c in cards:
+            if date.fromisoformat(c["due"]) <= today:
+                due.append({**c, "note": note_id, "title": titles[note_id]})
+            else:
+                later.append(c["due"])
+    due.sort(key=lambda c: c["due"])
+    return {"cards": due, "next_due": min(later) if later else None}
 
 
 def yaml_string(text):
@@ -152,13 +205,15 @@ def glossary_cards(body):
     return cards
 
 
-def flashcards_csv(entries):
+def flashcards_csv(entries, cards=None):
     """Anki can import this file: front, back and the note it came from, with no header row."""
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
     for meta, body, _ in entries:
         for term, back in glossary_cards(body):
             writer.writerow([term, back, meta["title"]])
+        for c in (cards or {}).get(meta.get("id"), []):
+            writer.writerow([c["q"], c["a"], meta["title"]])
     return out.getvalue()
 
 
@@ -166,7 +221,7 @@ def safe_name(title):
     return " ".join(re.sub(r'[\\/:*?"<>|\x00-\x1f]+', " ", title).split())[:80] or "Note"
 
 
-def library_zip(entries, source_of):
+def library_zip(entries, source_of, cards=None):
     """Every note as a Markdown file in notes/, plus the flashcards as flashcards.csv."""
     buf = io.BytesIO()
     used = set()
@@ -177,5 +232,5 @@ def library_zip(entries, source_of):
                 name = f"{name} {meta['id']}"
             used.add(name.lower())
             zf.writestr(f"notes/{name}.md", note_markdown(meta, body, highlights, source_of(meta)))
-        zf.writestr("flashcards.csv", flashcards_csv(entries))
+        zf.writestr("flashcards.csv", flashcards_csv(entries, cards))
     return buf.getvalue()

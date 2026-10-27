@@ -15,9 +15,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (!vid) return;
   // sidePanel.open needs the user gesture, so call it before anything async.
   if (tab?.id !== undefined) chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
-  startJob(`https://www.youtube.com/watch?v=${vid}`, 60, vid).catch(e => {
-    chrome.action.setBadgeText({ tabId: tab?.id, text: "!" });
-    chrome.action.setTitle({ tabId: tab?.id, title: `EasyNotes: ${e.message}` });
+  chrome.storage.local.get("level").then(o => startJob(`https://www.youtube.com/watch?v=${vid}`, 60, o.level || "normal", vid)).catch(e => {
+    chrome.action.setBadgeText({ tabId: tab?.id, text: "!" }).catch(() => {});
+    chrome.action.setTitle({ tabId: tab?.id, title: `EasyNotes: ${e.message}` }).catch(() => {});
   });
 });
 
@@ -36,9 +36,11 @@ async function noteIds() {
 async function badge(tabId, url) {
   const vid = videoId(url);
   const has = vid && (await noteIds()).has(vid);
-  chrome.action.setBadgeBackgroundColor({ tabId, color: "#3f56b2" });
-  chrome.action.setBadgeText({ tabId, text: has ? "✓" : "" });
-  chrome.action.setTitle({ tabId, title: has ? "EasyNotes: notes ready for this video" : "EasyNotes" });
+  await Promise.all([
+    chrome.action.setBadgeBackgroundColor({ tabId, color: "#3f56b2" }),
+    chrome.action.setBadgeText({ tabId, text: has ? "✓" : "" }),
+    chrome.action.setTitle({ tabId, title: has ? "EasyNotes: notes ready for this video" : "EasyNotes" }),
+  ]).catch(() => {});
 }
 
 chrome.tabs.onUpdated.addListener((tabId, change, tab) => { if (change.url || change.status === "complete") badge(tabId, tab.url); });
