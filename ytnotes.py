@@ -31,6 +31,7 @@ NOTES = ROOT / "notes"
 INDEX = NOTES / "index.json"
 COLLECTIONS = NOTES / "collections.json"
 HIGHLIGHTS = NOTES / "highlights.json"
+FLASHCARDS = NOTES / "flashcards.json"
 FRAMES = NOTES / "frames"
 MAX_PLAYLIST = 50
 SKIP_LISTS = ("RD", "WL", "LL", "UL")
@@ -105,6 +106,19 @@ Length should match the substance: about 800 words for a 10-minute video, up to 
 GLOSSARY_PROMPT = """The notes on stdin were written from a YouTube video. Write a glossary for them.
 
 Output only the "## Glossary" section, or nothing if there are no such terms."""
+
+FLASHCARDS_PROMPT = """The notes on stdin were written from a YouTube video or an article. Write flashcards that help the reader remember what matters.
+
+Write one card for each idea worth remembering: key claims, the reasoning behind them, frameworks and their steps, numbers, and how to apply the action items.
+Write about one card per 100 words of notes, from 5 to 25 cards. Skip the glossary terms; they already have cards.
+Each question must make sense on its own, without the notes, and ask for one thing. Prefer "why" and "how" questions over trivia.
+Each answer is one or two short sentences. Use only what the notes say.
+
+Write each card as two lines, then a blank line:
+Q: the question
+A: the answer
+
+Output only the cards."""
 
 SPOKEN_TONE = """
 Tone. Write the notes in a spoken tone, the way a friend would explain it to you out loud after watching the video or reading the article.
@@ -468,6 +482,7 @@ def delete_note(vid):
         if cols:
             COLLECTIONS.write_text(json.dumps(cols, indent=2, ensure_ascii=False))
     library.drop_highlights(HIGHLIGHTS, vid)
+    library.drop_cards(FLASHCARDS, vid)
     for ext in ("md", "m4a"):
         (NOTES / f"{vid}.{ext}").unlink(missing_ok=True)
     BUS.publish("notes", {"id": vid, "deleted": True})
@@ -481,6 +496,21 @@ def run_audio_job(job, vid, voice):
         job.update(status="done", ids=[vid], message="Audio ready")
     except Exception as e:
         job.update(status="error", message=str(e))
+
+
+def make_flashcards(vid, model):
+    meta = next((n for n in load_index() if n["id"] == vid), None)
+    if not meta or not (NOTES / f"{vid}.md").exists():
+        raise LookupError("Note not found")
+    md = note_text(vid)
+    language = meta.get("language", "en")
+    prompt = FLASHCARDS_PROMPT + "\n\n" + ("Write the questions and answers in Burmese. Keep the Q: and A: markers in English."
+                                            if language == "my" else "Write in English.")
+    out = llm.run_burmese(prompt, model, md, md, timeout=300) if language == "my" else llm.run(prompt, model, md, timeout=300)
+    pairs = library.parse_cards(out.stdout) if out.returncode == 0 else []
+    if not pairs:
+        raise RuntimeError("The model did not write any flashcards. Try again.")
+    return library.set_cards(FLASHCARDS, vid, pairs, datetime.now().date())
 
 
 def add_glossary(vid, model):
@@ -795,10 +825,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, library.note_markdown(meta, body, highlights, source_of(meta)).encode(),
                              "text/markdown; charset=utf-8", attachment(f"{library.safe_name(meta['title'])}.md"))
         if self.path == "/api/export/flashcards.csv":
-            return self.send(200, library.flashcards_csv(note_entries()).encode(), "text/csv; charset=utf-8",
+            return self.send(200, library.flashcards_csv(note_entries(), library.load(FLASHCARDS)).encode(), "text/csv; charset=utf-8",
                              attachment("easynotes-flashcards.csv"))
         if self.path == "/api/export.zip":
-            return self.send(200, library.library_zip(note_entries(), source_of), "application/zip",
+            return self.send(200, library.library_zip(note_entries(), source_of, library.load(FLASHCARDS)), "application/zip",
                              attachment("easynotes-library.zip"))
         m = re.fullmatch(r"/api/notes/([\w-]{11})", self.path)
         if m:
@@ -807,7 +837,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(404, {"error": "not found"})
             return self.send(200, {**meta, "markdown": note_text(meta["id"]),
                                    "highlights": library.highlights_for(HIGHLIGHTS, meta["id"]),
+                                   "flashcards": len(library.load(FLASHCARDS).get(meta["id"], [])),
                                    "collections": note_collections(meta["id"])})
+        if self.path == "/api/flashcards":
+            return self.send(200, library.due_cards(FLASHCARDS, load_index(), datetime.now().date(),
+                                                    query.get("note", [None])[0]))
         if self.path == "/api/daily":
             return self.send(200, daily_view())
         if self.path == "/api/collections":
@@ -844,6 +878,21 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(400, {"error": str(e)})
             BUS.publish("highlights", {"id": m.group(1)})
             return self.send(201, item)
+        m = re.fullmatch(r"/api/notes/([\w-]{11})/flashcards", self.path)
+        if m:
+            try:
+                return self.send(201, make_flashcards(m.group(1), self.model))
+            except LookupError as e:
+                return self.send(404, {"error": str(e)})
+            except Exception as e:
+                return self.send(500, {"error": str(e)})
+        m = re.fullmatch(r"/api/flashcards/([\w-]{11})/(\w+)", self.path)
+        if m:
+            try:
+                card = library.review_card(FLASHCARDS, m.group(1), m.group(2), body.get("grade"), datetime.now().date())
+            except ValueError as e:
+                return self.send(400, {"error": str(e)})
+            return self.send(200, card) if card else self.send(404, {"error": "not found"})
         m = re.fullmatch(r"/api/audio/([\w-]{11})", self.path)
         if m:
             voice = body.get("voice") if body.get("voice") in dict(VOICES) else VOICES[0][0]

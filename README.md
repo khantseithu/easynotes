@@ -80,7 +80,13 @@ To take your notes elsewhere, use these downloads:
 
 - Export under a note saves that note as a Markdown file. The file has a short header with the title, the channel and the link, and it lists your highlights at the end. Obsidian and most other note apps can open it.
 - Export all in the library saves every note as a Markdown file in a zip file.
-- Flashcards in the library saves each glossary term as a row of a CSV file. In Anki, choose Import and select the file. The file has no header row, and each row has the term, its explanation, and the title of the note.
+- Flashcards in the library saves each glossary term and each AI flashcard as a row of a CSV file. In Anki, choose Import and select the file. The file has no header row, and each row has the term, its explanation, and the title of the note.
+
+## Flashcards
+
+To remember a note, select Make flashcards below its title. The model reads the note and writes question and answer cards about its key ideas, frameworks and numbers. Then you study them right away.
+
+Select Review at the top of the library to study every card that is due. Read the question, press Space to see the answer, and then grade yourself: 1 for Again, 2 for Good, or 3 for Easy. Cards that you know come back after a day, then three days, then less and less often. Cards that you miss come back in the same session. Your cards are saved on your Mac in `notes/flashcards.json`.
 
 ## Today: a daily watch list
 
