@@ -24,7 +24,7 @@ const state = {
   server: "", windowId: null, tab: null, tabVid: null,
   route: { kind: "tab" }, // "tab" follows the YouTube tab; "library" and "note" are picked by the user
   notes: null, voices: [], note: null, terms: {}, jobs: {},
-  minutes: 60, q: "", playing: null, offline: null, confirmDelete: null,
+  minutes: 60, level: "normal", q: "", playing: null, offline: null, confirmDelete: null,
 };
 
 // ---------- data ----------
@@ -79,6 +79,19 @@ function offlineView() {
   $("#retry").onclick = refresh;
 }
 
+function levelRow(on) {
+  return `<div class="seg-row ${on}" id="level-row"><span class="${on ? "vh" : ""}">Notes</span>
+    <div class="seg" role="group" aria-label="How detailed the notes are">
+      ${[["normal", "Normal"], ["detailed", "Detailed"]].map(([v, l]) => `<button type="button" data-level="${v}" aria-pressed="${v === state.level}">${l}</button>`).join("")}
+    </div></div>`;
+}
+function pickLevel(e) {
+  const b = e.target.closest("[data-level]");
+  if (!b) return;
+  state.level = b.dataset.level;
+  local.set("level", state.level);
+  document.querySelectorAll("#level-row [data-level]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.level === state.level)));
+}
 function jobFor(vid) { return Object.values(state.jobs).find(j => j.vid === vid); }
 
 function makeView(vid) {
@@ -92,16 +105,18 @@ function makeView(vid) {
         ? `<button class="btn primary wide" disabled><span class="spin"></span><span>Writing notes…</span></button>
            <div class="progress">${esc(job.message || "Starting…")}</div>`
         : `<p>No notes for this video yet. Notes for a one-hour video take about one minute.</p>
+           ${levelRow("on")}
            <button class="btn primary wide" id="make">${ICON.notes}<span>${job ? "Try again" : "Make notes"}</span></button>
            ${job ? `<p class="msg err">${esc(job.message)}</p>` : ""}`}
     </div>`;
   $(".thumb").addEventListener("error", e => e.target.remove(), { once: true });
+  if ($("#level-row")) $("#level-row").onclick = pickLevel;
   const btn = $("#make");
   if (btn) btn.onclick = async () => {
     if (job) await removeJob(job.id);
     btn.disabled = true;
     try {
-      await startJob(`https://www.youtube.com/watch?v=${vid}`, state.minutes, vid);
+      await startJob(`https://www.youtube.com/watch?v=${vid}`, state.minutes, state.level, vid);
     } catch (e) {
       state.offline = e.message;
     }
@@ -123,6 +138,7 @@ function libraryView() {
         <div class="seg" role="group" aria-label="How much video to cover">
           ${[[30, "30m"], [60, "1h"], [120, "2h"], [240, "4h"]].map(([m, l]) => `<button type="button" data-min="${m}" aria-pressed="${m === state.minutes}">${l}</button>`).join("")}
         </div><span>of video</span></div>
+      ${levelRow("")}
     </form>
     ${jobs.map(j => `<div class="job ${j.status === "error" ? "err" : ""}"><div class="t">${esc(j.label)}</div>
       <div class="m">${j.status === "error" ? "" : `<span class="spin"></span>`}<span>${esc(j.message || "Starting…")}</span>
@@ -134,13 +150,14 @@ function libraryView() {
       <div class="t">${esc(n.title)}</div><div class="m"><span>${esc(n.channel)}</span><span>${n.read_mins} min read</span>${n.audio ? "<span>Audio</span>" : ""}</div></button></li>`).join("")
       : `<li class="empty">${q ? "No notes match." : "No notes yet. Open a YouTube video, or paste a link above."}</li>`}</ul>`;
   const input = $("#in");
-  input.oninput = () => { $("#go").disabled = !input.value.trim(); $("#seg-row").classList.toggle("on", !!input.value.trim() && !isUrl(input.value)); };
+  input.oninput = () => { $("#go").disabled = !input.value.trim(); $("#seg-row").classList.toggle("on", !!input.value.trim() && !isUrl(input.value)); $("#level-row").classList.toggle("on", !!input.value.trim()); };
   $("#seg-row").onclick = e => { const b = e.target.closest("[data-min]"); if (b) { state.minutes = +b.dataset.min; local.set("minutes", state.minutes); libraryView(); } };
+  $("#level-row").onclick = pickLevel;
   $("#composer").onsubmit = async e => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
-    try { await startJob(text, state.minutes, videoId(text) || (/^[\w-]{11}$/.test(text) ? text : null)); } catch (err) { state.offline = err.message; }
+    try { await startJob(text, state.minutes, state.level, videoId(text) || (/^[\w-]{11}$/.test(text) ? text : null)); } catch (err) { state.offline = err.message; }
     await syncJobs();
     render();
   };
@@ -449,12 +466,8 @@ async function play(n) {
   if (state.playing?.id !== n.id) {
     state.playing = n;
     audio.src = `${state.server}/audio/${n.id}.m4a?v=${n.audio.voice}`;
-    // The server keeps the position, so the app on a phone can continue from here, and the other way round.
-    const resume = api(`/api/notes/${n.id}/position`).then(r => r.secs).catch(() => local.get(`pos:${n.id}`, 0));
-    audio.addEventListener("loadedmetadata", async () => {
-      const at = await resume;
-      if (state.playing?.id === n.id && at && at < audio.duration - 5) audio.currentTime = at;
-    }, { once: true });
+    const resume = await local.get(`pos:${n.id}`, 0);
+    audio.addEventListener("loadedmetadata", () => { if (resume && resume < audio.duration - 5) audio.currentTime = resume; }, { once: true });
     $("#p-title").textContent = n.title;
     navigator.mediaSession.metadata = new MediaMetadata({ title: n.title, artist: n.channel, album: "EasyNotes" });
   }
@@ -471,7 +484,7 @@ function syncPlayer() {
 }
 $("#p-play").onclick = togglePlay;
 $("#p-title").onclick = () => { if (state.playing) { state.route = { kind: "note", id: state.playing.id }; render(); } };
-$("#p-close").onclick = () => { if (state.playing && audio.currentTime && !audio.ended) savePosition(state.playing.id, audio.currentTime); audio.pause(); player.classList.remove("on"); state.playing = null; setPlayerH(); renderActions(); };
+$("#p-close").onclick = () => { audio.pause(); player.classList.remove("on"); state.playing = null; setPlayerH(); renderActions(); };
 $("#p-speed").onclick = async () => {
   const next = SPEEDS[(SPEEDS.indexOf(await local.get("speed", 1)) + 1) % SPEEDS.length];
   local.set("speed", next); audio.playbackRate = next; $("#p-speed").textContent = `${next}×`;
@@ -483,16 +496,11 @@ audio.addEventListener("play", syncPlayer);
 audio.addEventListener("pause", syncPlayer);
 audio.addEventListener("loadedmetadata", () => { $("#p-dur").textContent = clock(audio.duration); });
 let lastSave = 0;
-function savePosition(id, secs) {
-  local.set(`pos:${id}`, secs);
-  post(`/api/notes/${id}/position`, { secs }).catch(() => {});
-}
-audio.addEventListener("pause", () => { if (state.playing && audio.currentTime && !audio.ended) savePosition(state.playing.id, audio.currentTime); });
 audio.addEventListener("timeupdate", () => {
   if (!seeking && audio.duration) { $("#p-seek").value = audio.currentTime / audio.duration * 100; $("#p-cur").textContent = clock(audio.currentTime); }
-  if (state.playing && !audio.paused && Date.now() - lastSave > 5000) { savePosition(state.playing.id, audio.currentTime); lastSave = Date.now(); }
+  if (state.playing && Date.now() - lastSave > 4000) { local.set(`pos:${state.playing.id}`, audio.currentTime); lastSave = Date.now(); }
 });
-audio.addEventListener("ended", () => { if (state.playing) savePosition(state.playing.id, 0); syncPlayer(); });
+audio.addEventListener("ended", () => { if (state.playing) local.set(`pos:${state.playing.id}`, 0); syncPlayer(); });
 new ResizeObserver(setPlayerH).observe(player);
 
 // ---------- jobs ----------
@@ -550,6 +558,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 (async () => {
   state.windowId = (await chrome.windows.getCurrent()).id;
   state.minutes = await local.get("minutes", 60);
+  state.level = await local.get("level", "normal");
   voicePref = await local.get("voice", null);
   $("#p-speed").textContent = `${await local.get("speed", 1)}×`;
   syncPlayer();

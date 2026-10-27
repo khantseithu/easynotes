@@ -1,20 +1,16 @@
-"""Quizzes, spaced review and chat: what helps the reader remember a note after reading it."""
+"""Quizzes and questions about a note: ways to check and deepen what the reader understood."""
 import json
 import random
 import re
 import threading
 import uuid
-from datetime import date, datetime, timedelta
-
-import library
+from datetime import datetime
 
 LOCK = threading.Lock()
 MAX_QUESTION = 1000
 MAX_CHAT = 40
-FIRST_EASE = 2.5
-MIN_EASE = 1.3
 
-QUIZ_PROMPT = """The notes on stdin were written from {source}. Write a quiz that shows whether the reader understood and remembers them.
+QUIZ_PROMPT = """The notes on stdin were written from {source}. Write a quiz that shows whether the reader understood them.
 
 Write {count} multiple-choice questions. Each question tests one important idea, framework, number or step from the notes, not a small detail.
 Ask about meaning and use, not only wording, for example "Why ...", "What happens when ..." or "Which of these is an example of ...".
@@ -92,7 +88,7 @@ def parse_quiz(text, shuffle=random.shuffle):
 
 def load(path):
     data = json.loads(path.read_text()) if path.exists() else {}
-    return {"quizzes": data.get("quizzes", {}), "cards": data.get("cards", {}), "chats": data.get("chats", {})}
+    return {"quizzes": data.get("quizzes", {}), "chats": data.get("chats", {})}
 
 
 def save(path, data):
@@ -107,110 +103,9 @@ def save_quiz(path, vid, questions):
     quiz = {"created": datetime.now().isoformat(timespec="seconds"), "questions": questions}
     with LOCK:
         data = load(path)
-        old = {q["id"] for q in (data["quizzes"].get(vid) or {}).get("questions", [])}
-        # New questions replace the old ones, so their review cards go too.
-        data["cards"] = {k: c for k, c in data["cards"].items() if not (c["note"] == vid and c["ref"] in old and c["kind"] == "quiz")}
         data["quizzes"][vid] = quiz
         save(path, data)
     return quiz
-
-
-def card_id(vid, kind, ref):
-    return f"{vid}:{kind}:{ref}"
-
-
-def schedule(card, correct, today):
-    """A short form of SM-2: each right answer makes the gap longer, and a wrong answer starts it again."""
-    card = {"interval": 0, "ease": FIRST_EASE, "reps": 0, "lapses": 0, **card}
-    if correct:
-        card["reps"] += 1
-        card["interval"] = 1 if card["reps"] == 1 else 3 if card["reps"] == 2 else max(card["interval"] + 1, round(card["interval"] * card["ease"]))
-    else:
-        card["reps"] = 0
-        card["interval"] = 1
-        card["lapses"] += 1
-        card["ease"] = max(MIN_EASE, round(card["ease"] - 0.2, 2))
-    card["due"] = (today + timedelta(days=card["interval"])).isoformat()
-    card["last"] = today.isoformat()
-    return card
-
-
-def enroll(path, vid, answers, terms, today=None):
-    """Add a note to review after its quiz: each question, scheduled by the answer, and each glossary term.
-
-    answers maps question ids to True or False. Cards that are already in review keep their schedule.
-    """
-    today = today or date.today()
-    with LOCK:
-        data = load(path)
-        quiz = data["quizzes"].get(vid) or {"questions": []}
-        for q in quiz["questions"]:
-            key = card_id(vid, "quiz", q["id"])
-            if key not in data["cards"] and q["id"] in answers:
-                data["cards"][key] = schedule({"note": vid, "kind": "quiz", "ref": q["id"]}, bool(answers[q["id"]]), today)
-        for term in terms:
-            key = card_id(vid, "term", term)
-            if key not in data["cards"]:
-                data["cards"][key] = {"note": vid, "kind": "term", "ref": term, "interval": 0, "ease": FIRST_EASE,
-                                      "reps": 0, "lapses": 0, "due": (today + timedelta(days=1)).isoformat()}
-        save(path, data)
-    return stats(path, today)
-
-
-def in_review(path, vid):
-    return any(c["note"] == vid for c in load(path)["cards"].values())
-
-
-def card_view(key, card, data, notes, read_text):
-    """What the review screen shows for a card, or None when its note, question or term is gone."""
-    meta = notes.get(card["note"])
-    if not meta:
-        return None
-    base = {"id": key, "kind": card["kind"], "note": card["note"], "title": meta["title"], "language": meta.get("language", "en")}
-    if card["kind"] == "quiz":
-        q = next((q for q in (data["quizzes"].get(card["note"]) or {}).get("questions", []) if q["id"] == card["ref"]), None)
-        return q and {**base, **{k: q[k] for k in ("q", "choices", "answer", "why")}}
-    back = dict(library.glossary_cards(read_text(card["note"]))).get(card["ref"])
-    return back and {**base, "term": card["ref"], "back": back}
-
-
-def due(path, notes, read_text, today=None, limit=40):
-    """The cards to review today, oldest first."""
-    today = (today or date.today()).isoformat()
-    data = load(path)
-    notes = {n["id"]: n for n in notes}
-    out = []
-    for key, card in sorted(data["cards"].items(), key=lambda kc: (kc[1]["due"], kc[0])):
-        if card["due"] > today:
-            break
-        view = card_view(key, card, data, notes, read_text)
-        if view:
-            out.append(view)
-        if len(out) >= limit:
-            break
-    return out
-
-
-def answer(path, key, correct, today=None):
-    today = today or date.today()
-    with LOCK:
-        data = load(path)
-        if key not in data["cards"]:
-            return None
-        data["cards"][key] = schedule(data["cards"][key], correct, today)
-        save(path, data)
-        return data["cards"][key]
-
-
-def stats(path, today=None, notes=None):
-    """How many cards are due today, how many there are, and when the next one is due."""
-    today = (today or date.today()).isoformat()
-    cards = load(path)["cards"].values()
-    if notes is not None:
-        ids = {n["id"] for n in notes}
-        cards = [c for c in cards if c["note"] in ids]
-    later = sorted(c["due"] for c in cards if c["due"] > today)
-    return {"due": sum(c["due"] <= today for c in cards), "total": len(cards), "next": later[0] if later else None}
 
 
 def chat_for(path, vid):
@@ -235,11 +130,9 @@ def clear_chat(path, vid):
 
 
 def drop_note(path, vid):
-    """Forget the quiz, the review cards and the chat of a deleted note."""
+    """Forget the quiz and the chat of a deleted note."""
     with LOCK:
         data = load(path)
-        data["quizzes"].pop(vid, None)
-        data["chats"].pop(vid, None)
-        data["cards"] = {k: c for k, c in data["cards"].items() if c["note"] != vid}
-        if path.exists():
+        found = [data[key].pop(vid, None) for key in ("quizzes", "chats")]
+        if any(x is not None for x in found):
             save(path, data)

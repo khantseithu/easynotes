@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 import argparse
-import getpass
 import hashlib
 import json
-import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -21,7 +18,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
 
-import access
 import context
 import daily
 import learn
@@ -35,9 +31,8 @@ NOTES = ROOT / "notes"
 INDEX = NOTES / "index.json"
 COLLECTIONS = NOTES / "collections.json"
 HIGHLIGHTS = NOTES / "highlights.json"
-POSITIONS = NOTES / "positions.json"
+FLASHCARDS = NOTES / "flashcards.json"
 LEARN = NOTES / "learn.json"
-AUTH_KEY = NOTES / ".auth-key"
 FRAMES = NOTES / "frames"
 MAX_PLAYLIST = 50
 SKIP_LISTS = ("RD", "WL", "LL", "UL")
@@ -47,7 +42,6 @@ TTS_LOCK = threading.Lock()
 JOBS = {}
 DAILY = daily.Store(NOTES)
 DAILY_JOB = {}
-GATE = access.Gate("", AUTH_KEY)
 VOICES = [
     ("af_heart", "Heart · US female"), ("af_bella", "Bella · US female"),
     ("am_michael", "Michael · US male"), ("am_fenrir", "Fenrir · US male"),
@@ -57,7 +51,6 @@ SECTION_INTROS = {"tl;dr": "In short.", "key ideas": "Key ideas.", "frameworks":
                   "quotes": "A few memorable quotes.", "action items": "Action items.", "glossary": "Glossary.",
                   "goal": "The goal.", "prerequisites": "What you need.", "steps": "The steps.",
                   "gotchas": "Gotchas.", "result": "The result."}
-KINDS = ("conversation", "talk", "tutorial")
 GLOSSARY_SECTION = """## Glossary
 Every abbreviation and acronym used anywhere in the notes above (e.g. LTV, CAC, ARR, ICP, PLG), plus industry jargon
 a smart newcomer to the field would not know (e.g. churn, payback period). Skip everyday words, product names and analogies entirely: never list a skipped term or comment on what you skipped.
@@ -66,7 +59,7 @@ Omit this section only if the notes use no such terms."""
 DIAGRAM_RULE = """Diagrams. When a process, cycle, decision, hierarchy, timeline or system is much clearer as a picture than as bullets,
 draw it as a Mermaid diagram in a fenced code block tagged "mermaid", directly under the bullets it explains. {where}
 Use at most {count}, and none when the bullets already say it clearly. Never put a diagram in the {first} section.
-Start each diagram with an "accTitle:" line that says what it shows. Prefer "flowchart LR" or "flowchart TD".
+Start each diagram with "flowchart LR" or "flowchart TD". Put an "accTitle:" line immediately after it that says what the diagram shows.
 Keep node labels to a few words in the output language, wrap labels that contain punctuation in double quotes,
 and do not use styles, classes, click actions or links. Draw only what the source says."""
 
@@ -100,104 +93,59 @@ Concrete things to do, as "- [ ] ..." checkboxes.
 """ + DIAGRAM_RULE.format(where="Frameworks and multi-step key ideas are the usual places.", count="two diagrams",
                           first="TL;DR") + """
 
-Length should match the substance: about 300 words for a 10-minute video, up to about 1500 for a long interview.
+{length}
 Use only what is in the transcript, except glossary definitions, which may use general knowledge. Timestamps must come from the [mm:ss] markers in the transcript.
 Output only the notes."""
+LEVELS = ("normal", "detailed")
+VIDEO_LENGTH = {
+    "normal": "Length should match the substance: about 300 words for a 10-minute video, up to about 1500 for a long interview.",
+    "detailed": """Write detailed notes. Cover every idea, example, number and step the speaker gives, in the order they come, so nothing useful is lost.
+Length should match the substance: about 800 words for a 10-minute video, up to about 4000 for a long interview.""",
+}
 
 GLOSSARY_PROMPT = """The notes on stdin were written from a YouTube video. Write a glossary for them.
 
 Output only the "## Glossary" section, or nothing if there are no such terms."""
 
-TUTORIAL_PROMPT = """Turn the YouTube tutorial on stdin into notes that let the reader follow along and build the same thing
-without watching the whole video. They should only need to watch a short clip when a step is hard to follow.
+FLASHCARDS_PROMPT = """The notes on stdin were written from a YouTube video or an article. Write flashcards that help the reader remember what matters.
 
-Video: "{title}" by {channel} ({duration}, published {published})
+Write one card for each idea worth remembering: key claims, the reasoning behind them, frameworks and their steps, numbers, and how to apply the action items.
+Write about one card per 100 words of notes, from 5 to 25 cards. Skip the glossary terms; they already have cards.
+Each question must make sense on its own, without the notes, and ask for one thing. Prefer "why" and "how" questions over trivia.
+Each answer is one or two short sentences. Use only what the notes say.
 
-Write the notes in the requested output language.
+Write each card as two lines, then a blank line:
+Q: the question
+A: the answer
 
-Write markdown in exactly this structure:
+Output only the cards."""
 
-## Goal
-2-3 sentences: what the reader builds or learns, and the approach the video takes.
-
-## Prerequisites
-Bullets: the tools, languages, libraries, accounts and keys the tutorial needs, with versions when the video or the sources name them.
-
-## Steps
-Numbered steps in the order the video does them. Give each step a ### heading that starts with its number and ends with
-the timestamp where it starts, like "### 3. Add the database schema [12:34]".
-Under each heading, write what to do in short imperative sentences, one instruction per sentence, and state any condition before the instruction.
-Add the exact commands and code the step needs in fenced code blocks with a language tag.
-Show only the code the step adds or changes, not whole files, unless the file is short.
-Say which file each code block belongs to.
-
-## Gotchas
-Bullets: the errors, warnings and pitfalls that the presenter hits or mentions, each with its fix and timestamp. Omit this section if there are none.
-
-## Result
-What the reader has at the end, and the next steps or extensions that the video suggests.
-
-""" + GLOSSARY_SECTION.format(language="English") + """
-
-""" + DIAGRAM_RULE.format(where="Good uses: how the parts of the finished project connect, or a request or data flow, under the step that builds it.",
-                          count="two diagrams", first="Goal") + """
-
-Sources. Stdin can contain these blocks before the transcript:
-- "Chapters": the video's own chapters. Use them to shape the steps, but split or merge chapters when a step needs it.
-- "Linked sources": the repos, gists and docs pages linked in the video description.
-Take code, commands, file names and versions from the linked sources when they match what the video does, because the
-transcript cannot show what is on screen. If a step needs code that is in neither the transcript nor the sources,
-write your best reconstruction and add the line "_Reconstructed from the transcript. Check it against the video._" under the block.
-If the sources and the video disagree, follow the video and say what the source does differently.
-Timestamps must come from the [mm:ss] markers in the transcript. Glossary definitions may use general knowledge.
-Output only the notes."""
-
-KIND_PROMPT = """Classify the YouTube video described on stdin. Answer with one word:
-- tutorial: the viewer is shown how to build, code, configure or use something step by step (coding walkthroughs and hands-on product demos count).
-- talk: one speaker presents or lectures on a topic, with no hands-on steps to follow.
-- conversation: an interview, podcast, panel or discussion between people.
-Output only the word."""
-
-
-def simple_english_rules():
-    path = ROOT / "skills" / "simple-english" / "SKILL.md"
-    if not path.exists():
-        return ""
-    text = path.read_text()
-    section = text.split("## The Document", 1)[-1].split("## The Reply", 1)[0]
-    rules = "\n".join(l for l in section.splitlines() if "references/" not in l).split("\nBefore (AI output):", 1)[0].strip()
-    check = text.split("## Self-Check Before You Deliver", 1)[-1].split("## Modes", 1)[0]
-    doc_check = next((l for l in check.splitlines() if l.startswith("2. Document:")), "")
-    return f"""
-
-Writing rules (the simple-english skill, plain mode). Apply them to every sentence you write.
-The required structure above wins where the two conflict: keep its headings, bullets, checkboxes, timestamps and bold glossary terms.
-Never change verbatim quotes, numbers, names or facts.
-
-<simple-english>
-{rules}
-
-Self-check: {doc_check.removeprefix("2. Document: ")}
-</simple-english>"""
-
-
-WRITING_RULES = simple_english_rules()
+SPOKEN_TONE = """
+Tone. Write the notes in a spoken tone, the way a friend would explain it to you out loud after watching the video or reading the article.
+Talk to the reader directly, with everyday words and short sentences that sound natural when read aloud.
+Keep every specific: frameworks, steps, numbers, examples, names and the reasoning behind claims.
+Skip filler, hype and throat-clearing such as "In this video" or "It's worth noting". No emoji.
+The required structure above wins: keep its headings, bullets, checkboxes, timestamps and bold glossary terms.
+Never change verbatim quotes, numbers, names or facts."""
+ENGLISH_TONE = """
+Call the reader "you" and use contractions (it's, you'll, don't).
+Small spoken links like "so", "here's the thing" and "in other words" are fine when they help the ideas flow. Do not overuse them."""
 
 
 def output_language_rules(language):
     if language == "my":
         return """
 Write in clear, natural Burmese for a Burmese reader. Use Burmese for explanations and prose, including glossary definitions.
-Keep the required English markdown section headings exactly as written so the app can recognize them. Tutorial step headings may be Burmese.
+Keep the required English markdown section headings exactly as written so the app can recognize them.
+Use spoken, everyday Burmese, the way people talk, not formal written Burmese. Prefer spoken endings and particles such as တယ်, ပါတယ်, မယ်, ဘူး, မှာ, နဲ့ and ရဲ့ over written forms such as သည်, မည်, ၏, တွင် and နှင့်.
 Write all explanatory prose in Burmese. Keep Latin text only for names, technical terms, code, commands, file names, versions, numbers, and verbatim source text where appropriate. Explain technical terms in Burmese; include the original English term when that helps identify it. Do not use unrelated scripts, or include drafting, translation, or self-review remarks. Return only the requested note.
-"""
-    return "Write in English.\n" + WRITING_RULES
+""" + SPOKEN_TONE
+    return "Write in English.\n" + SPOKEN_TONE + ENGLISH_TONE
 
 
-def notes_prompt(kind, language):
-    prompt = TUTORIAL_PROMPT if kind == "tutorial" else NOTES_PROMPT
+def notes_prompt(language, level="normal"):
     section = GLOSSARY_SECTION.format(language="Burmese" if language == "my" else "English")
-    prompt = prompt.replace(GLOSSARY_SECTION.format(language="English"), section)
+    prompt = NOTES_PROMPT.replace(GLOSSARY_SECTION.format(language="English"), section).replace("{length}", VIDEO_LENGTH[level])
     return prompt + "\n\n" + output_language_rules(language)
 
 
@@ -361,127 +309,9 @@ def save_note(meta, body):
     return meta
 
 
-def detect_kind(meta, extra, transcript, model):
-    about = "\n\n".join(part for part in [
-        f"Title: {meta['title']}\nChannel: {meta['channel']}\nLength: {ytlearn.fmt_duration(meta['secs'])}",
-        "Description:\n" + extra["description"][:3000],
-        "Chapters:\n" + "\n".join(t for _, t in extra["chapters"]) if extra["chapters"] else "",
-        "Start of the transcript:\n" + transcript[:4000],
-    ] if part)
-    out = llm.run(KIND_PROMPT, model, about, timeout=180)
-    words = re.findall(r"[a-z]+", out.stdout.lower()) if out.returncode == 0 else []
-    return next((w for w in reversed(words) if w in KINDS), "conversation")
-
-
-def to_secs(text):
-    secs = 0
-    for part in text.split(":"):
-        secs = secs * 60 + int(part)
-    return secs
-
-
-def download_video(vid, workdir):
-    out = subprocess.run(["yt-dlp", "-f", "bv*[height<=720][vcodec^=avc1]/bv*[height<=720]/b[height<=720]/b", "--quiet",
-                    "--no-warnings", "--no-playlist", "-o", str(Path(workdir) / "video.%(ext)s"),
-                    f"https://www.youtube.com/watch?v={vid}"], capture_output=True, text=True, timeout=1800)
-    video = next((f for f in Path(workdir).glob("video.*") if not f.name.endswith(".part")), None)
-    if video and video.stat().st_size:
-        return video, ""
-    errors = [l for l in out.stderr.splitlines() if "ERROR" in l]
-    return None, (errors or out.stderr.strip().splitlines() or ["no output"])[-1][:200]
-
-
-THUMB = (32, 18)
-
-
-def tiny_frame(video, t):
-    """A 32x18 grayscale copy of the frame at t seconds, as bytes, for comparing frames cheaply."""
-    out = subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1",
-                          "-vf", f"scale={THUMB[0]}:{THUMB[1]},format=gray", "-f", "rawvideo", "-"],
-                         capture_output=True, timeout=60)
-    return out.stdout if len(out.stdout) == THUMB[0] * THUMB[1] else None
-
-
-def frame_diff(a, b):
-    return sum(abs(x - y) for x, y in zip(a, b)) / len(a)
-
-
-def pick_frames(video, spans, per_step=6):
-    """Choose one moment in each (start, end) span that best shows what is on screen.
-
-    Tutorials cut back to the same shot again and again, usually the presenter talking to the camera.
-    So for each step, take a few candidate frames and keep the one that looks least like the candidates
-    of the other steps. Blank frames (fades, black screens) are skipped."""
-    cands = []
-    for i, (t0, t1) in enumerate(spans):
-        span = max(2, t1 - t0)
-        for k in range(per_step):
-            t = t0 + span * (0.1 + 0.8 * k / max(1, per_step - 1))
-            img = tiny_frame(video, t)
-            if img:
-                mean = sum(img) / len(img)
-                if (sum((x - mean) ** 2 for x in img) / len(img)) ** 0.5 >= 12:
-                    cands.append((i, t, img))
-    picks = {}
-    for i, t, img in cands:
-        others = sorted(frame_diff(img, o) for j, _, o in cands if j != i)
-        score = sum(others[:3]) / len(others[:3]) if others else 0
-        if score > picks.get(i, (-1, 0))[0]:
-            picks[i] = (score, t)
-    return [picks[i][1] if i in picks else t0 + min(5, (t1 - t0) / 4) for i, (t0, t1) in enumerate(spans)]
-
-
-def add_frames(vid, md, total, log=print):
-    """Put a frame from the video under each numbered step, linked to that moment in the video.
-    Returns the new markdown and an error message, which is empty when the frames worked."""
-    steps = list(re.finditer(r"^### (\d+)\..*\[(\d{1,2}(?::\d{2}){1,2})\]\s*$", md, re.M))
-    if not steps:
-        return md, ""
-    log(f"Downloading the video for screenshots ({len(steps)} steps)…")
-    out_dir = FRAMES / vid
-    starts = [to_secs(m.group(2)) for m in steps]
-    spans = [(t0, starts[i + 1] if i + 1 < len(starts) and starts[i + 1] > t0 else (total or t0 + 30))
-             for i, t0 in enumerate(starts)]
-    with tempfile.TemporaryDirectory() as workdir:
-        video, error = download_video(vid, workdir)
-        if not video:
-            log(f"No screenshots: the video download failed ({error})")
-            return md, f"The video download failed, so this note has no screenshots. yt-dlp said: {error}"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        for old in out_dir.glob("*.jpg"):
-            old.unlink()
-        log("Choosing screenshots…")
-        times = pick_frames(video, spans)
-        for m, t in zip(steps, times):
-            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1",
-                            "-vf", "scale='min(1280,iw)':-2", "-q:v", "4", str(out_dir / f"{m.group(1)}.jpg")],
-                           capture_output=True, timeout=120)
-    parts, last = [], 0
-    for m, t in zip(steps, times):
-        if (out_dir / f"{m.group(1)}.jpg").exists():
-            parts += [md[last:m.end()], f"\n\n[![Step {m.group(1)} at {stamp(t)}](/frames/{vid}/{m.group(1)}.jpg)]"
-                                        f"(https://youtu.be/{vid}?t={int(t)})"]
-            last = m.end()
-    return "".join(parts) + md[last:], ""
-
-
-def links_section(urls):
-    items = []
-    for url in urls:
-        p = urllib.parse.urlparse(url)
-        host = (p.hostname or "").removeprefix("www.")
-        segs = [x for x in p.path.split("/") if x]
-        if host == "github.com" and len(segs) >= 2:
-            label = f"GitHub: {segs[0]}/{segs[1]}"
-        else:
-            label = host + ("/" + "/".join(segs) if segs else "")
-        items.append(f"- [{label}]({url})")
-    return "## Links\nFrom the video description.\n" + "\n".join(items) if items else ""
-
-
-def make_notes(vid, model, log=print, kind=None):
+def make_notes(vid, model, log=print, level="normal"):
     existing = next((n for n in load_index() if n["id"] == vid), None)
-    if existing and (NOTES / f"{vid}.md").exists():
+    if existing and (level == "normal" or existing.get("level") == level) and (NOTES / f"{vid}.md").exists():
         log(f"Already have notes for {existing['title']}")
         return existing
     with tempfile.TemporaryDirectory() as workdir:
@@ -493,55 +323,32 @@ def make_notes(vid, model, log=print, kind=None):
                 break
     if not transcript:
         raise RuntimeError(f"No English or Burmese transcript available for {vid}")
-    if kind not in KINDS:
-        log(f"Checking what kind of video this is: {meta['title']}")
-        kind = detect_kind(meta, extra, transcript,
-                           llm.model_for_language(meta.get("language", "en"), model))
-    meta["kind"] = kind
     blocks = []
     if extra["chapters"]:
         blocks.append("## Chapters\n" + "\n".join(f"[{stamp(t)}] {title}" for t, title in extra["chapters"]))
     fmt = {"title": meta["title"], "channel": meta["channel"], "duration": ytlearn.fmt_duration(meta["secs"])}
-    if kind == "tutorial":
-        found, used = context.gather(context.links(extra["description"]), log)
-        if found:
-            blocks.append("## Linked sources\n" + found)
-            meta["sources"] = used
-        prompt = notes_prompt(kind, meta.get("language", "en")).format(**fmt, published=meta.get("published", "date unknown"))
-        heading = "## Goal"
-    else:
-        prompt = notes_prompt(kind, meta.get("language", "en")).format(**fmt)
-        if extra["chapters"]:
-            prompt += "\nThe video's own chapters come before the transcript on stdin. Use them to group the key ideas."
-        heading = "## TL;DR"
-    log(f"Writing {kind} notes: {meta['title']}")
+    prompt = notes_prompt(meta.get("language", "en"), level).format(**fmt)
+    if extra["chapters"]:
+        prompt += "\nThe video's own chapters come before the transcript on stdin. Use them to group the key ideas."
+    log(f"Writing notes: {meta['title']}")
     stdin = "\n\n".join(blocks + ["## Transcript\n" + transcript]) if blocks else transcript
     source = stdin[:400000]
     out = llm.run_burmese(prompt, model, source, source) if meta.get("language") == "my" \
         else llm.run(prompt, model, source)
     body = out.stdout.strip()
-    if out.returncode != 0 or not body.startswith(heading):
+    if out.returncode != 0 or not body.startswith("## TL;DR"):
         reason = (out.stderr.strip() or body).splitlines()[-1][:200] if (out.stderr.strip() or body) else "no output"
         raise RuntimeError(f"Notes failed for {meta['title']}: {reason}")
     body = clean_glossary(body)
-    if kind == "tutorial":
-        links = links_section(context.links(extra["description"]))
-        if links:
-            body = body.replace("\n## Glossary", f"\n{links}\n\n## Glossary", 1) if "\n## Glossary" in body \
-                else f"{body.rstrip()}\n\n{links}\n"
-        body, error = add_frames(vid, body, meta["secs"], log)
-        if error:
-            # Shown at the top of the note, so the reader knows why the screenshots are missing.
-            notice = f"> {error} Try `brew upgrade yt-dlp`, then make the note again.\n\n"
-            body = re.sub(r"^## Steps\n", lambda m: m.group(0) + notice, body, count=1, flags=re.M)
-        meta["frames"] = len(list((FRAMES / vid).glob("*.jpg"))) if (FRAMES / vid).exists() else 0
+    if level != "normal":
+        meta["level"] = level
     return save_note(meta, link_stamps(body, vid))
 
 
-def make_article_notes(url, model, log=print):
+def make_article_notes(url, model, log=print, level="normal"):
     article_id = "a" + hashlib.sha256(url.encode()).hexdigest()[:10]
     existing = next((n for n in load_index() if n["id"] == article_id), None)
-    if existing and (NOTES / f"{article_id}.md").exists():
+    if existing and (level == "normal" or existing.get("level") == level) and (NOTES / f"{article_id}.md").exists():
         return existing
     log(f"Reading article: {url}")
     page = context.page_text(context.get(url))
@@ -562,7 +369,7 @@ Write markdown in exactly this structure:
 One sentence.
 
 ## Key ideas
-3 to 7 concrete, useful takeaways.
+{"Every main idea, in order, each with the details, examples and numbers that support it." if level == "detailed" else "3 to 7 concrete, useful takeaways."}
 
 ## Action items
 Concrete things to do, as "- [ ] ..." checkboxes. Omit if there are none.
@@ -581,6 +388,8 @@ Use only information in the article, except glossary definitions. Output only th
         raise RuntimeError(f"Article notes failed: {reason}")
     meta = {"id": article_id, "title": title, "channel": host.removeprefix("www."), "url": url,
             "secs": 0, "language": language, "kind": "article"}
+    if level != "normal":
+        meta["level"] = level
     return save_note(meta, result)
 
 
@@ -671,7 +480,7 @@ def delete_note(vid):
         if cols:
             COLLECTIONS.write_text(json.dumps(cols, indent=2, ensure_ascii=False))
     library.drop_highlights(HIGHLIGHTS, vid)
-    library.drop_position(POSITIONS, vid)
+    library.drop_cards(FLASHCARDS, vid)
     learn.drop_note(LEARN, vid)
     for ext in ("md", "m4a"):
         (NOTES / f"{vid}.{ext}").unlink(missing_ok=True)
@@ -686,28 +495,19 @@ def run_audio_job(job, vid, voice):
         job.update(status="error", message=str(e))
 
 
-def add_glossary(vid, model):
-    path = NOTES / f"{vid}.md"
-    md = path.read_text()
-    if re.search(r"^## Glossary", md, re.M):
-        return False
-    language = next((n.get("language", "en") for n in load_index() if n["id"] == vid), "en")
-    out = llm.run_burmese(glossary_prompt(language), model, md, md, timeout=300) if language == "my" \
-        else llm.run(glossary_prompt(language), model, md, timeout=300)
-    out = out.stdout.strip() if out.returncode == 0 else ""
-    if not out.startswith("## Glossary"):
-        return False
-    out = clean_glossary(out)
-    path.write_text(md.rstrip() + "\n\n" + out + "\n")
-    with LOCK:
-        index = load_index()
-        for n in index:
-            if n["id"] == vid:
-                n.pop("audio", None)
-                n["words"] = len(path.read_text().split())
-                n["read_mins"] = max(1, round(n["words"] / 230))
-        INDEX.write_text(json.dumps(index, indent=2, ensure_ascii=False))
-    return True
+def make_flashcards(vid, model):
+    meta = next((n for n in load_index() if n["id"] == vid), None)
+    if not meta or not (NOTES / f"{vid}.md").exists():
+        raise LookupError("Note not found")
+    md = note_text(vid)
+    language = meta.get("language", "en")
+    prompt = FLASHCARDS_PROMPT + "\n\n" + ("Write the questions and answers in Burmese. Keep the Q: and A: markers in English."
+                                            if language == "my" else "Write in English.")
+    out = llm.run_burmese(prompt, model, md, md, timeout=300) if language == "my" else llm.run(prompt, model, md, timeout=300)
+    pairs = library.parse_cards(out.stdout) if out.returncode == 0 else []
+    if not pairs:
+        raise RuntimeError("The model did not write any flashcards. Try again.")
+    return library.set_cards(FLASHCARDS, vid, pairs, datetime.now().date())
 
 
 def note_meta(vid):
@@ -715,7 +515,7 @@ def note_meta(vid):
 
 
 def learning_rules(language):
-    return learn.BURMESE_RULES if language == "my" else output_language_rules("en")
+    return learn.BURMESE_RULES if language == "my" else "Write in plain English, with short sentences and everyday words."
 
 
 def model_failure(out, what):
@@ -766,8 +566,28 @@ def start_task(message, fn, *args):
     return job
 
 
-def review_stats():
-    return learn.stats(LEARN, notes=load_index())
+def add_glossary(vid, model):
+    path = NOTES / f"{vid}.md"
+    md = path.read_text()
+    if re.search(r"^## Glossary", md, re.M):
+        return False
+    language = next((n.get("language", "en") for n in load_index() if n["id"] == vid), "en")
+    out = llm.run_burmese(glossary_prompt(language), model, md, md, timeout=300) if language == "my" \
+        else llm.run(glossary_prompt(language), model, md, timeout=300)
+    out = out.stdout.strip() if out.returncode == 0 else ""
+    if not out.startswith("## Glossary"):
+        return False
+    out = clean_glossary(out)
+    path.write_text(md.rstrip() + "\n\n" + out + "\n")
+    with LOCK:
+        index = load_index()
+        for n in index:
+            if n["id"] == vid:
+                n.pop("audio", None)
+                n["words"] = len(path.read_text().split())
+                n["read_mins"] = max(1, round(n["words"] / 230))
+        INDEX.write_text(json.dumps(index, indent=2, ensure_ascii=False))
+    return True
 
 
 def load_collections():
@@ -874,7 +694,7 @@ def topic_videos(topic, minutes, model):
     return ytlearn.rank(topic, pool, budget, 1, model) if pool else []
 
 
-def run_job(job, text, minutes, model, kind=None):
+def run_job(job, text, minutes, model, level="normal"):
     def log(msg):
         job["message"] = msg
 
@@ -909,8 +729,8 @@ def run_job(job, text, minutes, model, kind=None):
         def one(item):
             source_type, value = item
             try:
-                note = make_article_notes(value, model, log if len(work) == 1 else (lambda m: None)) if source_type == "article" \
-                    else make_notes(value, model, log if len(work) == 1 else (lambda m: None), kind)
+                note = make_article_notes(value, model, log if len(work) == 1 else (lambda m: None), level) if source_type == "article" \
+                    else make_notes(value, model, log if len(work) == 1 else (lambda m: None), level)
                 done.append(note["id"])
             except Exception as e:
                 errors[value] = str(e)
@@ -967,9 +787,6 @@ def daily_view():
             "job": DAILY_JOB if DAILY_JOB.get("status") == "running" else None}
 
 
-PUBLIC_PATHS = {"/manifest.webmanifest", "/favicon.ico", "/api/login"}
-
-
 class Handler(BaseHTTPRequestHandler):
     model = None
 
@@ -1010,22 +827,10 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
 
-    def signed_in(self, path):
-        """Ask for the password when the server has one and the request is not from this Mac."""
-        if path in PUBLIC_PATHS or path.startswith("/assets/") or GATE.allowed(self.client_address[0], self.headers):
-            return True
-        if path == "/":
-            self.send(401, (ROOT / "login.html").read_bytes(), "text/html; charset=utf-8")
-        else:
-            self.send(401, {"error": "Sign in first"})
-        return False
-
     def do_GET(self):
         url = urlparse(self.path)
         self.path = url.path
         query = parse_qs(url.query)
-        if not self.signed_in(self.path):
-            return
         if self.path == "/api/voices":
             return self.send(200, [{"id": v, "label": label} for v, label in VOICES])
         m = re.fullmatch(r"/audio/([\w-]{11})\.m4a", self.path)
@@ -1064,14 +869,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, library.note_markdown(meta, body, highlights, source_of(meta)).encode(),
                              "text/markdown; charset=utf-8", attachment(f"{library.safe_name(meta['title'])}.md"))
         if self.path == "/api/export/flashcards.csv":
-            return self.send(200, library.flashcards_csv(note_entries()).encode(), "text/csv; charset=utf-8",
+            return self.send(200, library.flashcards_csv(note_entries(), library.load(FLASHCARDS)).encode(), "text/csv; charset=utf-8",
                              attachment("easynotes-flashcards.csv"))
         if self.path == "/api/export.zip":
-            return self.send(200, library.library_zip(note_entries(), source_of), "application/zip",
+            return self.send(200, library.library_zip(note_entries(), source_of, library.load(FLASHCARDS)), "application/zip",
                              attachment("easynotes-library.zip"))
-        m = re.fullmatch(r"/api/notes/([\w-]{11})/position", self.path)
-        if m:
-            return self.send(200, {"id": m.group(1), "secs": library.position_for(POSITIONS, m.group(1))})
         m = re.fullmatch(r"/api/notes/([\w-]{11})", self.path)
         if m:
             meta = next((n for n in load_index() if n["id"] == m.group(1)), None)
@@ -1079,15 +881,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(404, {"error": "not found"})
             return self.send(200, {**meta, "markdown": note_text(meta["id"]),
                                    "highlights": library.highlights_for(HIGHLIGHTS, meta["id"]),
+                                   "flashcards": len(library.load(FLASHCARDS).get(meta["id"], [])),
                                    "collections": note_collections(meta["id"]),
-                                   "position": library.position_for(POSITIONS, meta["id"]),
                                    "quiz": learn.quiz_for(LEARN, meta["id"]),
-                                   "chat": learn.chat_for(LEARN, meta["id"]),
-                                   "in_review": learn.in_review(LEARN, meta["id"])})
-        if self.path == "/api/review":
-            return self.send(200, {"cards": learn.due(LEARN, load_index(), note_text), **review_stats()})
-        if self.path == "/api/review/stats":
-            return self.send(200, review_stats())
+                                   "chat": learn.chat_for(LEARN, meta["id"])})
+        if self.path == "/api/flashcards":
+            return self.send(200, library.due_cards(FLASHCARDS, load_index(), datetime.now().date(),
+                                                    query.get("note", [None])[0]))
         if self.path == "/api/daily":
             return self.send(200, daily_view())
         if self.path == "/api/collections":
@@ -1104,48 +904,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send(404, {"error": "not found"})
 
     def do_POST(self):
-        self.path = urlparse(self.path).path
-        if not self.signed_in(self.path):
-            return
-        try:
-            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
-        except ValueError:
-            return self.send(400, {"error": "Bad request"})
-        if self.path == "/api/login":
-            cookie = GATE.sign_in(self.client_address[0], str(body.get("password") or ""))
-            if not cookie:
-                return self.send(401, {"error": "Wrong password, or too many tries. Wait a few minutes."})
-            return self.send(200, {"ok": True}, headers={"Set-Cookie": cookie})
-        m = re.fullmatch(r"/api/notes/([\w-]{11})/(position|quiz|quiz/results|chat)", self.path)
-        if m and not note_meta(m.group(1)):
-            return self.send(404, {"error": "not found"})
-        if m and m.group(2) == "position":
-            try:
-                secs = library.save_position(POSITIONS, m.group(1), body.get("secs") or 0)
-            except (TypeError, ValueError):
-                return self.send(400, {"error": "secs must be a number"})
-            return self.send(200, {"id": m.group(1), "secs": secs})
-        if m and m.group(2) == "quiz":
-            quiz = learn.quiz_for(LEARN, m.group(1))
-            if quiz and not body.get("fresh"):
-                return self.send(200, quiz)
-            return self.send(202, start_task("Writing questions…", make_quiz, m.group(1), self.model))
-        if m and m.group(2) == "quiz/results":
-            answers = body.get("answers") if isinstance(body.get("answers"), dict) else {}
-            terms = [term for term, _ in library.glossary_cards(note_text(m.group(1)))]
-            learn.enroll(LEARN, m.group(1), answers, terms)
-            return self.send(200, review_stats())
-        if m and m.group(2) == "chat":
-            question = " ".join(str(body.get("question") or "").split())
-            if not question:
-                return self.send(400, {"error": "Type a question"})
-            if len(question) > learn.MAX_QUESTION:
-                return self.send(400, {"error": f"Keep the question under {learn.MAX_QUESTION} characters"})
-            return self.send(202, start_task("Thinking…", ask_note, m.group(1), question, self.model))
-        if self.path == "/api/review":
-            if not learn.answer(LEARN, str(body.get("card") or ""), bool(body.get("correct"))):
-                return self.send(404, {"error": "Card not found"})
-            return self.send(200, review_stats())
+        body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
         m = re.fullmatch(r"/api/notes/([\w-]{11})/read", self.path)
         if m:
             if not any(n["id"] == m.group(1) for n in load_index()):
@@ -1162,6 +921,36 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 return self.send(400, {"error": str(e)})
             return self.send(201, item)
+        m = re.fullmatch(r"/api/notes/([\w-]{11})/(quiz|chat)", self.path)
+        if m and not note_meta(m.group(1)):
+            return self.send(404, {"error": "not found"})
+        if m and m.group(2) == "quiz":
+            quiz = learn.quiz_for(LEARN, m.group(1))
+            if quiz and not body.get("fresh"):
+                return self.send(200, quiz)
+            return self.send(202, start_task("Writing questions…", make_quiz, m.group(1), self.model))
+        if m and m.group(2) == "chat":
+            question = " ".join(str(body.get("question") or "").split())
+            if not question:
+                return self.send(400, {"error": "Type a question"})
+            if len(question) > learn.MAX_QUESTION:
+                return self.send(400, {"error": f"Keep the question under {learn.MAX_QUESTION} characters"})
+            return self.send(202, start_task("Thinking…", ask_note, m.group(1), question, self.model))
+        m = re.fullmatch(r"/api/notes/([\w-]{11})/flashcards", self.path)
+        if m:
+            try:
+                return self.send(201, make_flashcards(m.group(1), self.model))
+            except LookupError as e:
+                return self.send(404, {"error": str(e)})
+            except Exception as e:
+                return self.send(500, {"error": str(e)})
+        m = re.fullmatch(r"/api/flashcards/([\w-]{11})/(\w+)", self.path)
+        if m:
+            try:
+                card = library.review_card(FLASHCARDS, m.group(1), m.group(2), body.get("grade"), datetime.now().date())
+            except ValueError as e:
+                return self.send(400, {"error": str(e)})
+            return self.send(200, card) if card else self.send(404, {"error": "not found"})
         m = re.fullmatch(r"/api/audio/([\w-]{11})", self.path)
         if m:
             voice = body.get("voice") if body.get("voice") in dict(VOICES) else VOICES[0][0]
@@ -1189,13 +978,12 @@ class Handler(BaseHTTPRequestHandler):
         JOBS[job_id] = {"id": job_id, "status": "running", "message": "Starting…", "ids": [], "collections": [],
                         "title": None, "total": 0, "done": 0, "input": text, "label": body.get("label") or text,
                         "vid": body.get("vid")}
-        threading.Thread(target=run_job, args=(JOBS[job_id], text, int(body.get("minutes") or 60), self.model,
-                                               body.get("kind")), daemon=True).start()
+        level = body.get("level") if body.get("level") in LEVELS else "normal"
+        threading.Thread(target=run_job, args=(JOBS[job_id], text, int(body.get("minutes") or 60), self.model, level),
+                         daemon=True).start()
         self.send(202, JOBS[job_id])
 
     def do_DELETE(self):
-        if not self.signed_in(urlparse(self.path).path):
-            return
         m = re.fullmatch(r"/api/notes/([\w-]{11})/chat", urlparse(self.path).path)
         if m:
             learn.clear_chat(LEARN, m.group(1))
@@ -1226,34 +1014,18 @@ def lan_ip():
             return "127.0.0.1"
 
 
-def tailscale_ip():
-    """This Mac's Tailscale address, which a phone on the same tailnet can open from anywhere."""
-    cli = shutil.which("tailscale") or next((p for p in ["/Applications/Tailscale.app/Contents/MacOS/Tailscale"]
-                                              if Path(p).exists()), None)
-    if not cli:
-        return None
-    try:
-        out = subprocess.run([cli, "ip", "-4"], capture_output=True, text=True, timeout=5)
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    return out.stdout.split()[0] if out.returncode == 0 and out.stdout.strip() else None
-
-
 def main():
     ap = argparse.ArgumentParser(description="Read YouTube videos instead of watching them.")
     ap.add_argument("input", nargs="*", help="YouTube links, playlist links, or a topic; omit to open the app")
     ap.add_argument("-t", "--time", type=int, default=60, help="minutes of video to cover for a topic")
     ap.add_argument("--model", default=None,
                     help=f"Gemini model (agy), pi model as provider/model (default: English {DEFAULT_MODEL}, Burmese {llm.BURMESE_MODEL}; explicit choice applies to both), or a Claude model such as claude-haiku-5-5")
+    ap.add_argument("--level", default="normal", choices=LEVELS, help="how much detail the notes keep")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true", help="don't open the browser")
-    ap.add_argument("--lan", action="store_true", help="also serve on your local network or tailnet, e.g. for your phone")
-    ap.add_argument("--password", action="store_true",
-                    help="ask other devices for a password; prompts for it, or set EASYNOTES_PASSWORD")
+    ap.add_argument("--lan", action="store_true", help="also serve on your local network, e.g. for your phone")
     ap.add_argument("--audio", action="store_true", help="also record an audio version with Kokoro")
     ap.add_argument("--voice", default=VOICES[0][0], choices=[v for v, _ in VOICES])
-    ap.add_argument("--kind", choices=["auto", *KINDS], default="auto",
-                    help="note structure to use; auto detects it from the video (default)")
     ap.add_argument("--daily", action="store_true",
                     help="make today's watch list from your channels; adds the channels of your notes the first time")
     ap.add_argument("--add-glossary", action="store_true", help="add a glossary to existing notes that lack one")
@@ -1281,7 +1053,7 @@ def main():
 
     if args.input:
         job = {"status": "running", "message": "", "ids": []}
-        run_job(job, "\n".join(args.input), args.time, args.model, args.kind)
+        run_job(job, "\n".join(args.input), args.time, args.model, args.level)
         if job["status"] == "error":
             sys.exit(job["message"])
         for vid in job["ids"]:
@@ -1293,13 +1065,6 @@ def main():
             print(job["message"], file=sys.stderr)
         return
 
-    global GATE
-    password = os.environ.get("EASYNOTES_PASSWORD", "")
-    if args.password and not password:
-        password = getpass.getpass("Password for other devices: ")
-        if not password:
-            sys.exit("The password can't be empty")
-    GATE = access.Gate(password, AUTH_KEY)
     Handler.model = args.model
     threading.Thread(target=auto_daily, args=(args.model,), daemon=True).start()
     server = ThreadingHTTPServer(("0.0.0.0" if args.lan else "127.0.0.1", args.port), Handler)
@@ -1307,11 +1072,6 @@ def main():
     print(f"EasyNotes running at {url}  (Ctrl+C to stop)")
     if args.lan:
         print(f"On your phone (same Wi-Fi): http://{lan_ip()}:{args.port}")
-        ts = tailscale_ip()
-        if ts:
-            print(f"On your phone (anywhere, with Tailscale): http://{ts}:{args.port}")
-        print("Other devices need the password." if GATE.on else
-              "Warning: no password. Each device that can reach this address can open the app. Add --password.")
     if not args.no_open:
         webbrowser.open(url)
     try:

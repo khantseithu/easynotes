@@ -20,12 +20,12 @@ flowchart LR
 
 class DiagramTests(unittest.TestCase):
     def test_every_note_prompt_asks_for_mermaid_diagrams(self):
-        for kind in ("conversation", "tutorial"):
-            for language in ("en", "my"):
-                prompt = ytnotes.notes_prompt(kind, language).format(
-                    title="T", channel="C", duration="1h", published="2026-10-01")
-                self.assertIn('tagged "mermaid"', prompt)
-        self.assertIn("Never put a diagram in the Goal section", ytnotes.notes_prompt("tutorial", "en"))
+        for language in ("en", "my"):
+            prompt = ytnotes.notes_prompt(language).format(
+                title="T", channel="C", duration="1h")
+            self.assertIn('tagged "mermaid"', prompt)
+            self.assertLess(prompt.index('"flowchart LR" or "flowchart TD"'), prompt.index('"accTitle:" line immediately after it'))
+        self.assertIn("Never put a diagram in the TL;DR section", ytnotes.notes_prompt("en"))
 
     def test_diagrams_are_not_read_aloud(self):
         script = ytnotes.speakable({"title": "Growth", "channel": "C"}, NOTE)
