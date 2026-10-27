@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, quote, urlparse
 
 import context
 import daily
+import events
 import library
 import llm
 import transcript
@@ -36,9 +37,10 @@ SKIP_LISTS = ("RD", "WL", "LL", "UL")
 DEFAULT_MODEL = llm.DEFAULT_MODEL
 LOCK = threading.Lock()
 TTS_LOCK = threading.Lock()
+BUS = events.Bus()
 JOBS = {}
 DAILY = daily.Store(NOTES)
-DAILY_JOB = {}
+DAILY_JOB = events.Job(BUS)
 VOICES = [
     ("af_heart", "Heart · US female"), ("af_bella", "Bella · US female"),
     ("am_michael", "Michael · US male"), ("am_fenrir", "Fenrir · US male"),
@@ -290,6 +292,7 @@ def save_note(meta, body):
         index = [n for n in load_index() if n["id"] != meta["id"]]
         index.insert(0, meta)
         INDEX.write_text(json.dumps(index, indent=2, ensure_ascii=False))
+    BUS.publish("notes", {"id": meta["id"]})
     return meta
 
 
@@ -388,6 +391,7 @@ def update_meta(vid, **fields):
             if n["id"] == vid:
                 n.update(fields)
         INDEX.write_text(json.dumps(index, indent=2, ensure_ascii=False))
+    BUS.publish("notes", {"id": vid})
 
 
 def speakable(meta, md):
@@ -466,6 +470,8 @@ def delete_note(vid):
     library.drop_highlights(HIGHLIGHTS, vid)
     for ext in ("md", "m4a"):
         (NOTES / f"{vid}.{ext}").unlink(missing_ok=True)
+    BUS.publish("notes", {"id": vid, "deleted": True})
+    BUS.publish("collections")
     return True
 
 
@@ -511,6 +517,7 @@ def save_collection(c):
         cols = [x for x in load_collections() if x["id"] != c["id"]]
         cols.insert(0, c)
         COLLECTIONS.write_text(json.dumps(cols, indent=2, ensure_ascii=False))
+    BUS.publish("collections", {"id": c["id"]})
 
 
 def tldr(md):
@@ -669,7 +676,7 @@ def start_daily(model):
         if DAILY_JOB.get("status") == "running":
             return DAILY_JOB
         DAILY_JOB.clear()
-        DAILY_JOB.update(id=uuid.uuid4().hex[:12], status="running", message="Starting…", ids=[])
+        DAILY_JOB.update(id=uuid.uuid4().hex[:12], kind="daily", status="running", message="Starting…", ids=[])
         JOBS[DAILY_JOB["id"]] = DAILY_JOB
     threading.Thread(target=run_daily_job, args=(DAILY_JOB, model), daemon=True).start()
     return DAILY_JOB
@@ -681,6 +688,7 @@ def run_daily_job(job, model):
         job.update(status="done", message=f"{len(data['picks'])} picks from {data['considered']} new videos")
     except Exception as e:
         job.update(status="error", message=str(e))
+    BUS.publish("daily")
 
 
 def auto_daily(model):
@@ -737,6 +745,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(f.read(end - start + 1))
             except (BrokenPipeError, ConnectionResetError):
                 pass
+
+    def send_events(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        BUS.stream(self.wfile.write)
 
     def do_GET(self):
         url = urlparse(self.path)
@@ -803,6 +818,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, collection_view(c)) if c else self.send(404, {"error": "not found"})
         if self.path == "/api/jobs":
             return self.send(200, [j for j in list(JOBS.values()) if j.get("input") and j["status"] == "running"])
+        if self.path == "/api/events":
+            return self.send_events()
         m = re.fullmatch(r"/api/jobs/(\w+)", self.path)
         if m and m.group(1) in JOBS:
             return self.send(200, JOBS[m.group(1)])
@@ -825,12 +842,13 @@ class Handler(BaseHTTPRequestHandler):
                 item = library.add_highlight(HIGHLIGHTS, m.group(1), body.get("quote"), body.get("comment"))
             except ValueError as e:
                 return self.send(400, {"error": str(e)})
+            BUS.publish("highlights", {"id": m.group(1)})
             return self.send(201, item)
         m = re.fullmatch(r"/api/audio/([\w-]{11})", self.path)
         if m:
             voice = body.get("voice") if body.get("voice") in dict(VOICES) else VOICES[0][0]
             job_id = uuid.uuid4().hex[:12]
-            JOBS[job_id] = {"id": job_id, "status": "running", "message": "Starting…", "ids": []}
+            JOBS[job_id] = events.Job(BUS, id=job_id, kind="audio", status="running", message="Starting…", ids=[])
             threading.Thread(target=run_audio_job, args=(JOBS[job_id], m.group(1), voice), daemon=True).start()
             return self.send(202, JOBS[job_id])
         if self.path == "/api/daily":
@@ -843,6 +861,7 @@ class Handler(BaseHTTPRequestHandler):
                     DAILY.add(daily.resolve(body.get("input") or ""))
             except Exception as e:
                 return self.send(400, {"error": str(e)})
+            BUS.publish("daily")
             return self.send(200, DAILY.sources())
         if self.path != "/api/jobs":
             return self.send(404, {"error": "not found"})
@@ -850,9 +869,9 @@ class Handler(BaseHTTPRequestHandler):
         if not text:
             return self.send(400, {"error": "Paste a YouTube or article link, or type a topic"})
         job_id = uuid.uuid4().hex[:12]
-        JOBS[job_id] = {"id": job_id, "status": "running", "message": "Starting…", "ids": [], "collections": [],
-                        "title": None, "total": 0, "done": 0, "input": text, "label": body.get("label") or text,
-                        "vid": body.get("vid")}
+        JOBS[job_id] = events.Job(BUS, id=job_id, kind="notes", status="running", message="Starting…", ids=[],
+                                  collections=[], title=None, total=0, done=0, input=text,
+                                  label=body.get("label") or text, vid=body.get("vid"))
         level = body.get("level") if body.get("level") in LEVELS else "normal"
         threading.Thread(target=run_job, args=(JOBS[job_id], text, int(body.get("minutes") or 60), self.model, level),
                          daemon=True).start()
@@ -861,11 +880,15 @@ class Handler(BaseHTTPRequestHandler):
     def do_DELETE(self):
         m = re.fullmatch(r"/api/sources/(UC[\w-]{22})", urlparse(self.path).path)
         if m:
-            return self.send(200, DAILY.sources()) if DAILY.remove(m.group(1)) else self.send(404, {"error": "not found"})
+            if not DAILY.remove(m.group(1)):
+                return self.send(404, {"error": "not found"})
+            BUS.publish("daily")
+            return self.send(200, DAILY.sources())
         m = re.fullmatch(r"/api/notes/([\w-]{11})/highlights/(\w+)", urlparse(self.path).path)
         if m:
             if not library.delete_highlight(HIGHLIGHTS, m.group(1), m.group(2)):
                 return self.send(404, {"error": "not found"})
+            BUS.publish("highlights", {"id": m.group(1)})
             return self.send(200, {"id": m.group(2), "deleted": True})
         m = re.fullmatch(r"/api/notes/([\w-]{11})", urlparse(self.path).path)
         if not m:

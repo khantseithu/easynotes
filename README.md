@@ -95,6 +95,14 @@ Select Make notes to read a pick instead of watching it. While the server runs, 
 
 To make the list from the command line, run `python3 ytnotes.py --daily`. The first time, it adds the channels of your notes.
 
+## Live updates
+
+Every open copy of the app stays up to date without a reload: browser tabs, your phone, and the Chrome extension. When you make notes, mark a note read, add a highlight, record audio, delete a note or change your channels on one of them, the others show the change within a second. Notes that you start on one device show their progress on the others.
+
+The server sends these changes as [Server-Sent Events](https://developer.mozilla.org/docs/Web/API/Server-sent_events) on `/api/events`. If the connection drops, the app reconnects by itself and reloads what changed. While it is disconnected, it checks for progress the old way, every one or two seconds.
+
+Changes from the command line, for example `python3 ytnotes.py "https://youtu.be/VIDEO_ID"`, run in a separate process, so open apps show them after a reload.
+
 ## Use the app on your phone
 
 Your phone and your Mac must be on the same Wi-Fi network. Start the server with the `--lan` flag:
@@ -171,6 +179,7 @@ The project has these files and folders:
 | `tts.py` | The script that records audio with Kokoro. |
 | `ytlearn.py` | The video search and the playlist builder. |
 | `daily.py` | The daily watch list: your channels, their RSS feeds, and the picks. |
+| `events.py` | The live updates that the server sends to each open app. |
 | `library.py` | Search, highlights, and the Markdown and flashcard exports. |
 | `context.py` | The code that gets chapters and reads article pages. |
 | `llm.py` | The code that sends prompts to agy, pi, or Claude Code. |

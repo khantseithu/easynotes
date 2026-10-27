@@ -1,4 +1,4 @@
-import { api, getServer, getJobs, post, removeJob, startJob, videoId } from "./lib.js";
+import { addJob, api, getServer, getJobs, post, removeJob, startJob, videoId } from "./lib.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -446,8 +446,7 @@ async function record(n) {
   try {
     let job = await post(`/api/audio/${n.id}`, { voice });
     while (job.status === "running") {
-      await new Promise(r => setTimeout(r, 800));
-      job = await api(`/api/jobs/${job.id}`);
+      job = await nextJob(job, 800);
       const pct = +(job.message.match(/(\d+)%/) || [])[1] || 0;
       if (state.note?.id === n.id) renderActions(job.message.replace(/…?\s*\d+%/, "").replace(/…$/, "") + (pct ? ` ${pct}%` : "…"), null, pct);
     }
@@ -507,10 +506,21 @@ new ResizeObserver(setPlayerH).observe(player);
 
 async function syncJobs() { state.jobs = await getJobs(); schedulePoll(); }
 
+// The live stream pushes job changes, so polling only fills in when the stream is down or quiet.
 let pollTimer = null;
 function schedulePoll() {
   clearTimeout(pollTimer);
-  if (Object.values(state.jobs).some(j => j.status === "running")) pollTimer = setTimeout(poll, 1500);
+  if (Object.values(state.jobs).some(j => j.status === "running")) pollTimer = setTimeout(poll, live.on ? 10000 : 1500);
+}
+
+// Save a job's new state. Returns true when the job finished.
+async function saveJob(id, j) {
+  const jobs = await getJobs();
+  if (!jobs[id]) return false;
+  if (j.status === "done") delete jobs[id];
+  else jobs[id] = { ...jobs[id], status: j.status, message: j.message };
+  await chrome.storage.session.set({ jobs });
+  return j.status === "done";
 }
 
 async function poll() {
@@ -520,22 +530,106 @@ async function poll() {
     try { j = await api(`/api/jobs/${job.id}`); } catch (e) {
       j = { status: "error", message: /not found/i.test(e.message) ? "The EasyNotes server restarted. Try again." : e.message };
     }
-    const jobs = await getJobs();
-    if (!jobs[job.id]) continue;
-    if (j.status === "done") { delete jobs[job.id]; finished = true; }
-    else jobs[job.id] = { ...jobs[job.id], status: j.status, message: j.message };
-    await chrome.storage.session.set({ jobs });
+    if (await saveJob(job.id, j)) finished = true;
   }
   state.jobs = await getJobs();
   if (finished) { await loadIndex(); chrome.runtime.sendMessage({ type: "notes-changed" }).catch(() => {}); }
-  if (!$("#md")) render();
+  if (!$("#md")) redraw();
   schedulePoll();
+}
+
+// ---------- live updates ----------
+// The server pushes each change as a Server-Sent Event, so jobs and the library update without polling,
+// and notes made in the app or on another device show here right away.
+const live = { es: null, server: null, on: false, jobs: {}, waiters: {}, queue: Promise.resolve(), notes: new Set(), timer: null };
+const newer = (a, b) => (b?.seq || 0) > (a?.seq || 0) ? b : a;
+
+// The job's next state: pushed by the server, or fetched when the stream is down or quiet for a while.
+function nextJob(j, ms) {
+  const known = live.jobs[j.id];
+  if ((known?.seq || 0) > (j.seq || 0)) return Promise.resolve(known);
+  return new Promise((resolve, reject) => {
+    const waiter = x => { clearTimeout(timer); resolve(x); };
+    const timer = setTimeout(() => {
+      live.waiters[j.id]?.delete(waiter);
+      api(`/api/jobs/${j.id}`).then(x => resolve(newer(x, live.jobs[j.id])), reject);
+    }, live.on ? 10000 : ms);
+    (live.waiters[j.id] ??= new Set()).add(waiter);
+  });
+}
+
+async function onJob(j) {
+  if ((live.jobs[j.id]?.seq || 0) >= j.seq) return;
+  live.jobs[j.id] = j;
+  const waiters = live.waiters[j.id];
+  delete live.waiters[j.id];
+  waiters?.forEach(f => f(j));
+  const jobs = await getJobs();
+  if (jobs[j.id]) await saveJob(j.id, j);
+  // Notes started in the app or on another device show here too.
+  else if (j.kind === "notes" && j.status === "running")
+    await addJob({ id: j.id, vid: j.vid || videoId(j.input), label: j.label, message: j.message, status: j.status, started: Date.now() });
+}
+
+// Changes come in bursts, so wait a moment and then reload once.
+function onChange(kind, d) {
+  if (kind === "notes") live.notes.add(d.id);
+  clearTimeout(live.timer);
+  live.timer = setTimeout(syncLive, 250);
+}
+
+async function syncLive() {
+  const ids = new Set(live.notes);
+  live.notes.clear();
+  await loadIndex();
+  chrome.runtime.sendMessage({ type: "notes-changed" }).catch(() => {});
+  const n = state.note;
+  if (!n || shown !== n.id || !$("#md")) return redraw();
+  const meta = state.notes?.find(x => x.id === n.id);
+  if (!meta) {
+    // Deleted in the app or on another device.
+    if (state.playing?.id === n.id) $("#p-close").click();
+    shown = null;
+    state.note = null;
+    if (state.route.kind === "note") state.route = { kind: "library" };
+    return render();
+  }
+  if (!ids.has(n.id)) return;
+  if (meta.created !== n.created) { shown = null; return render(); }  // Written again, for example as Detailed notes.
+  if (JSON.stringify(meta.audio) !== JSON.stringify(n.audio)) { state.note = { ...n, audio: meta.audio }; renderActions(); }
+}
+
+function connectLive() {
+  live.es?.close();
+  live.on = false;
+  live.server = state.server;
+  const es = live.es = new EventSource(`${state.server}/api/events`);
+  let opened = false;
+  // After the stream drops, or when the server starts while this panel waits for it, anything can have changed.
+  es.onopen = () => { live.on = true; if (opened || state.offline) syncLive(); opened = true; };
+  es.onerror = () => { live.on = false; };
+  es.addEventListener("job", e => { const j = JSON.parse(e.data); live.queue = live.queue.then(() => onJob(j)).catch(() => {}); });
+  ["notes", "daily"].forEach(kind => es.addEventListener(kind, e => onChange(kind, JSON.parse(e.data))));
+}
+
+// Draw the view again without losing what the reader is typing in it.
+function redraw() {
+  const el = document.activeElement;
+  const typing = el?.matches?.("#view input") ? { id: el.id, value: el.value, pos: el.selectionStart } : null;
+  render();
+  const again = typing?.id && document.getElementById(typing.id);
+  if (!again) return;
+  again.value = typing.value;
+  again.focus();
+  again.setSelectionRange(typing.pos, typing.pos);
+  again.oninput?.();
 }
 
 // ---------- wiring ----------
 
 async function refresh() {
   state.server = await getServer();
+  if (live.server !== state.server) connectLive();
   await Promise.all([loadIndex(), loadTab(), syncJobs()]);
   render();
 }
@@ -551,7 +645,7 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
   else if (change.title && state.route.kind === "tab" && state.tabVid && !hasNote(state.tabVid)) loadTab().then(render);
 });
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "session" && changes.jobs) syncJobs().then(() => { if (!$("#md")) render(); });
+  if (area === "session" && changes.jobs) syncJobs().then(() => { if (!$("#md")) redraw(); });
   if (area === "sync" && changes.server) { shown = null; refresh(); }
 });
 
