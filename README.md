@@ -2,6 +2,8 @@
 
 # EasyNotes
 
+https://github.com/user-attachments/assets/da3b7828-38a2-4f45-aa10-2a42282113ec
+
 EasyNotes turns YouTube videos and article pages into notes that you can read in a few minutes. Paste one or more links, a playlist, or a topic. The app writes the notes and can record an audio version of supported YouTube notes on your Mac.
 
 Each note has these parts:
