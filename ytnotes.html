@@ -259,6 +259,44 @@ mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color
 
 .item .snip { margin-top: 3px; font-size: 12.5px; line-height: 1.45; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
+.learn { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); font-family: var(--sans); }
+.learn h2 { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 10px; }
+.learn > p, .learn .note-line { color: var(--muted); font-size: 14.5px; line-height: 1.55; margin: 0 0 14px; }
+.learn .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.learn .st { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--muted); }
+.learn .err { color: var(--danger); font-size: 13.5px; margin: 10px 0 0; }
+.quiz-list { list-style: none; margin: 0 0 16px; padding: 0; counter-reset: q; }
+.qz { padding: 18px 0; border-bottom: 1px solid var(--line); counter-increment: q; }
+.qz-q { font-family: var(--serif); font-size: 18px; line-height: 1.5; margin: 0 0 12px; }
+.qz-q::before { content: counter(q) ". "; color: var(--faint); font-family: var(--sans); font-size: 14px; font-weight: 600; }
+.choices { display: grid; gap: 8px; }
+.choice { display: flex; align-items: flex-start; gap: 10px; width: 100%; min-height: 44px; padding: 10px 12px; text-align: left; border: 1px solid var(--line); border-radius: 10px;
+          background: var(--raised); font-size: 15px; line-height: 1.45; }
+.choice:hover:not(:disabled) { border-color: var(--accent); }
+.choice:disabled { cursor: default; }
+.choice .k { flex: none; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 650; color: var(--muted); background: var(--hover); }
+.choice.right { border-color: var(--accent); background: var(--accent-soft); }
+.choice.right .k { background: var(--accent); color: var(--accent-ink); }
+.choice.wrong { border-color: var(--danger); }
+.choice.wrong .k { background: var(--danger); color: var(--accent-ink); }
+.choice.dim { opacity: .6; }
+.why { margin: 10px 0 0; font-size: 14.5px; line-height: 1.55; color: var(--muted); }
+.why b { color: var(--text); font-weight: 650; }
+.score { font-size: 15px; margin: 0 0 14px; }
+.score b { font-weight: 650; }
+.qa { margin: 0 0 16px; padding: 0; list-style: none; }
+.qa > li { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.qa .asked { font-size: 14px; font-weight: 600; margin: 0 0 6px; }
+.qa .asked::before { content: "Q  "; color: var(--accent); white-space: pre; }
+.qa .answer { font-family: var(--serif); font-size: 17px; line-height: 1.6; }
+.qa .answer p, .qa .answer ul, .qa .answer ol { margin: 0 0 .6em; }
+.qa .answer ul, .qa .answer ol { padding-left: 1.2em; }
+.qa .answer code { font-size: .85em; background: var(--hover); padding: 1px 5px; border-radius: 4px; }
+.ask { display: flex; align-items: flex-end; gap: 8px; }
+.ask textarea { flex: 1; min-width: 0; min-height: 44px; max-height: 160px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--raised); font-size: 15px; line-height: 1.4; resize: vertical; outline: none; }
+.ask textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ask .btn { height: 44px; }
+
 .md { font-family: var(--serif); font-size: 19px; line-height: 1.68; color: var(--text); }
 .md > :first-child { margin-top: 32px; }
 .md p { margin: 0 0 1em; }
@@ -431,6 +469,7 @@ mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color
   .actions .confirm { flex: 1 1 100%; margin-left: 0; }
   .field textarea { font-size: 16px; }
   .filter input { font-size: 16px; }
+  .ask textarea { font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -538,6 +577,13 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 const api = async (url, opts) => { const r = await fetch(url, opts); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText); return j; };
+const post = (url, body) => api(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+// Model calls run as jobs on the server, because phones drop requests that wait too long.
+async function waitJob(job) {
+  while (job.status === "running") job = await nextJob(job, 1200);
+  if (job.status === "error") throw new Error(job.message);
+  return job.result;
+}
 const LINK_RE = /(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com|youtu\.be)\/\S+/g;
 const hasLink = s => (s.match(LINK_RE) || []).length > 0 || /^[\w-]{11}$/.test(s.trim());
 function describeInput(s) {
@@ -1063,6 +1109,8 @@ async function openNote(id) {
     <div class="md" id="md">${DOMPurify.sanitize(marked.parse(n.markdown))}</div>
     <section class="fc-list" id="fc-list" aria-label="Flashcards"></section>
     <section class="hl-list" id="hl-list" aria-label="Your highlights"></section>
+    <section class="learn" id="quiz" aria-label="Test yourself"></section>
+    <section class="learn" id="chat" aria-label="Ask about this note"></section>
     ${col && (col.prev || col.next) ? `<nav class="pager" aria-label="${esc(col.title)}">
       ${col.prev ? `<a class="prev" href="#${col.prev.id}"><small>Previous</small><b>${esc(col.prev.title)}</b></a>` : ""}
       ${col.next ? `<a class="next" href="#${col.next.id}"><small>Next</small><b>${esc(col.next.title)}</b></a>` : ""}
@@ -1073,7 +1121,10 @@ async function openNote(id) {
   $("#view").querySelectorAll(".crumb, .pager a").forEach(a => { a.removeAttribute("target"); a.removeAttribute("rel"); });
   renderActions();
   renderCards();
+  state.quizAnswers = store.get(`quiz:${n.id}`, {});
   renderHighlights();
+  renderQuiz();
+  renderChat();
   buildToc();
   scrollTo({ top: 0 });
 }
@@ -1171,6 +1222,143 @@ async function removeHighlight(id) {
   renderHighlights();
 }
 
+// state.note is replaced by a copy in some places, so changes go through its id.
+function patchNote(id, fields) { if (state.note?.id === id) Object.assign(state.note, fields); }
+
+// Test yourself: multiple-choice questions on the note, checked in place.
+function renderQuiz(err) {
+  const box = $("#quiz"), n = state.note;
+  if (!box || !n) return;
+  if (n.language === "my") box.lang = "my";
+  const fail = err ? `<p class="err" role="alert">${esc(err)}</p>` : "";
+  if (state.quizBusy === n.id) {
+    box.innerHTML = `<h2>Test yourself</h2><div class="st" role="status"><div class="spin"></div>Writing questions…</div>`;
+    return;
+  }
+  if (!n.quiz) {
+    box.innerHTML = `<h2>Test yourself</h2>
+      <p>Answer a few questions to check what you understood.</p>
+      <div class="row"><button class="btn primary" id="quiz-make"><span>Quiz me</span></button></div>${fail}`;
+    return;
+  }
+  const qs = n.quiz.questions, answers = state.quizAnswers || {};
+  const done = qs.filter(q => q.id in answers), right = done.filter(q => answers[q.id] === q.answer).length;
+  const finished = done.length === qs.length;
+  box.innerHTML = `<h2>Test yourself</h2>
+    <ol class="quiz-list">${qs.map(q => {
+      const picked = answers[q.id], answered = q.id in answers;
+      return `<li class="qz"><p class="qz-q">${esc(q.q)}</p>
+        <div class="choices" role="group" aria-label="Answers">${q.choices.map((c, i) => {
+          const cls = !answered ? "" : i === q.answer ? "right" : i === picked ? "wrong" : "dim";
+          const tag = answered && i === q.answer ? `<span class="vh">, the right answer</span>` : answered && i === picked ? `<span class="vh">, your answer</span>` : "";
+          return `<button class="choice ${cls}" data-quiz="${esc(q.id)}" data-i="${i}" ${answered ? "disabled" : ""}><span class="k" aria-hidden="true">${"ABCDEFGH"[i]}</span><span>${esc(c)}${tag}</span></button>`;
+        }).join("")}</div>
+        ${answered ? `<p class="why" id="why-${esc(q.id)}" tabindex="-1"><b>${picked === q.answer ? "Right." : "Not quite."}</b> ${esc(q.why)}</p>` : ""}</li>`;
+    }).join("")}
+    </ol>
+    ${finished ? `<p class="score"><b>${right} of ${qs.length} right.</b></p>` : `<p class="note-line">${done.length} of ${qs.length} answered</p>`}
+    <div class="row">
+      ${finished ? `<button class="btn" id="quiz-again"><span>Try again</span></button>` : ""}
+      <button class="btn" id="quiz-new"><span>New questions</span></button>
+    </div>${fail}`;
+}
+
+async function makeQuiz(fresh) {
+  const n = state.note;
+  state.quizBusy = n.id;
+  renderQuiz();
+  let err = "";
+  try {
+    const r = await post(`/api/notes/${n.id}/quiz`, { fresh });
+    const quiz = r.questions ? r : await waitJob(r);
+    patchNote(n.id, { quiz });
+    store.set(`quiz:${n.id}`, {});
+    if (state.note?.id === n.id) state.quizAnswers = {};
+  } catch (e) { err = e.message; }
+  if (state.quizBusy === n.id) state.quizBusy = null;
+  if (state.note?.id !== n.id) return;
+  renderQuiz(err);
+  if (!err) $("#quiz .choice")?.focus({ preventScroll: true });
+}
+
+function answerQuiz(qid, i) {
+  state.quizAnswers[qid] = i;
+  store.set(`quiz:${state.note.id}`, state.quizAnswers);
+  renderQuiz();
+  document.getElementById(`why-${qid}`)?.focus({ preventScroll: true });
+}
+
+// Ask about this note: follow-up questions, answered from the note first.
+function renderChat(err) {
+  const box = $("#chat"), n = state.note;
+  if (!box || !n) return;
+  if (n.language === "my") box.lang = "my";
+  const busy = state.chatBusy === n.id, chat = n.chat || [], pairs = [];
+  for (let i = 0; i < chat.length; i++) {
+    if (chat[i].role !== "user") continue;
+    pairs.push({ q: chat[i].text, a: chat[i + 1]?.role === "assistant" ? chat[++i].text : "" });
+  }
+  box.innerHTML = `<h2>Ask about this note</h2>
+    ${pairs.length || busy ? "" : `<p>Ask a question when something is unclear. The answer uses this note first, and says when it goes beyond the note.</p>`}
+    ${pairs.length || busy ? `<ol class="qa">${pairs.map(p => `<li><p class="asked">${esc(p.q)}</p><div class="answer">${DOMPurify.sanitize(marked.parse(p.a))}</div></li>`).join("")}${
+      busy ? `<li><p class="asked">${esc(state.chatPending)}</p><div class="st" role="status"><div class="spin"></div>Thinking…</div></li>` : ""}</ol>` : ""}
+    <form class="ask" id="ask">
+      <label class="vh" for="ask-in">Your question</label>
+      <textarea id="ask-in" rows="1" placeholder="Ask a question about this note" enterkeyhint="send" ${busy ? "disabled" : ""}></textarea>
+      <button class="btn primary" ${busy ? "disabled" : ""}><span>Ask</span></button>
+    </form>
+    ${pairs.length && !busy ? `<div class="row" style="margin-top:10px"><button class="btn" id="chat-clear"><span>Clear questions</span></button></div>` : ""}
+    ${err ? `<p class="err" role="alert">${esc(err)}</p>` : ""}`;
+  box.querySelectorAll(".answer a").forEach(a => { a.target = "_blank"; a.rel = "noopener"; });
+}
+
+async function askNote(question) {
+  const n = state.note;
+  state.chatBusy = n.id;
+  state.chatPending = question;
+  renderChat();
+  let err = "";
+  try {
+    patchNote(n.id, { chat: await waitJob(await post(`/api/notes/${n.id}/chat`, { question })) });
+  } catch (e) { err = e.message; }
+  if (state.chatBusy === n.id) state.chatBusy = null;
+  if (state.note?.id !== n.id) return;
+  renderChat(err);
+  if (err) $("#ask-in").value = question;
+  $("#ask-in").focus({ preventScroll: true });
+}
+
+async function clearChat() {
+  const n = state.note;
+  await api(`/api/notes/${n.id}/chat`, { method: "DELETE" });
+  patchNote(n.id, { chat: [] });
+  renderChat();
+}
+
+$("#view").addEventListener("click", e => {
+  const t = e.target;
+  if (t.closest("#quiz-make")) return makeQuiz(false);
+  if (t.closest("#quiz-new")) return makeQuiz(true);
+  if (t.closest("#quiz-again")) {
+    state.quizAnswers = {};
+    store.set(`quiz:${state.note.id}`, {});
+    renderQuiz();
+    return $("#quiz .choice")?.focus({ preventScroll: true });
+  }
+  const qc = t.closest("[data-quiz]");
+  if (qc) return answerQuiz(qc.dataset.quiz, +qc.dataset.i);
+  if (t.closest("#chat-clear")) return clearChat();
+});
+$("#view").addEventListener("submit", e => {
+  if (e.target.id !== "ask") return;
+  e.preventDefault();
+  const q = $("#ask-in").value.trim();
+  if (q) askNote(q);
+});
+$("#view").addEventListener("keydown", e => {
+  if (e.target.id === "ask-in" && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#ask").requestSubmit(); }
+});
+
 function voiceOf() { const v = store.get("voice", state.voices[0]?.id); return state.voices.some(x => x.id === v) ? v : state.voices[0]?.id; }
 function renderActions(msg, kind, pct) {
   const n = state.note;
@@ -1224,7 +1412,7 @@ async function deleteNote(n) {
   }
   state.confirmDelete = null;
   if (state.playing === n.id) $("#p-close").click();
-  try { localStorage.removeItem(`pos:${n.id}`); } catch {}
+  try { localStorage.removeItem(`pos:${n.id}`); localStorage.removeItem(`quiz:${n.id}`); } catch {}
   const col = n.collections?.[0];
   await Promise.all([loadNotes(), loadCollections()]);
   if (state.current !== n.id) return;
@@ -1239,8 +1427,7 @@ async function record(n) {
   try {
     let job = await api(`/api/audio/${n.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ voice }) });
     while (job.status === "running") {
-      await new Promise(r => setTimeout(r, 800));
-      job = await api(`/api/jobs/${job.id}`);
+      job = await nextJob(job, 800);
       const pct = +(job.message.match(/(\d+)%/) || [])[1] || 0;
       if (state.current === n.id) renderActions(job.message.replace(/…?\s*\d+%/, "").replace(/…$/, "") + (pct ? ` ${pct}%` : "…"), null, pct);
     }
@@ -1343,11 +1530,13 @@ async function resumeJobs() {
 }
 async function runJob(job, first, stay) {
   try {
-    let j = await first();
+    let j;
+    live.starting++;
+    try { j = await first(); } finally { live.starting--; }
+    job.id = j.id;
     let shown = j.ids?.length || 0;
     while (j.status === "running") {
-      await new Promise(r => setTimeout(r, 1500));
-      j = await api(`/api/jobs/${j.id}`);
+      j = await nextJob(j, 1500);
       Object.assign(job, { message: j.message, title: j.title, total: j.total, done: j.done });
       const colId = j.collections?.[0];
       if (colId && !job.opened) { job.opened = true; await loadCollections(); openCollection(colId); }
@@ -1450,10 +1639,9 @@ async function openToday(quiet) {
 async function pollDaily(id) {
   if (state.dailyPoll === id) return;
   state.dailyPoll = id;
-  let j = { status: "running" };
+  let j = { id, status: "running" };
   while (j.status === "running") {
-    await new Promise(r => setTimeout(r, 2000));
-    try { j = await api(`/api/jobs/${id}`); } catch { break; }
+    try { j = await nextJob(j, 2000); } catch { break; }
     if (state.daily?.job) { state.daily.job.message = j.message; todayMeta(); }
     if (state.current === "today") { const st = $("#view .st"); if (st && j.status === "running") st.lastChild.textContent = j.message; }
   }
@@ -1489,6 +1677,128 @@ $("#view").addEventListener("click", async e => {
   else if (e.target.closest("#src-seed")) sourcesCall({ body: { seed: true } }, "Finding the channels of your notes…");
   else if (e.target.closest("#daily-run")) { await api("/api/daily", { method: "POST" }); openToday(true); }
 });
+
+// ---------- live updates ----------
+// The server pushes each change as a Server-Sent Event, so jobs, notes and the Today list update without
+// polling, and a change on one device or tab shows on the others. Without the stream, the app polls as before.
+const live = { on: false, jobs: {}, waiters: {}, starting: 0, kinds: new Set(), notes: new Set(), marks: new Set(), learn: new Set(), timer: null };
+const newer = (a, b) => (b?.seq || 0) > (a?.seq || 0) ? b : a;
+
+// The job's next state: pushed by the server, or fetched when the stream is down or quiet for a while.
+function nextJob(j, ms) {
+  const known = live.jobs[j.id];
+  if ((known?.seq || 0) > (j.seq || 0)) return Promise.resolve(known);
+  return new Promise((resolve, reject) => {
+    const waiter = x => { clearTimeout(timer); resolve(x); };
+    const timer = setTimeout(() => {
+      live.waiters[j.id]?.delete(waiter);
+      api(`/api/jobs/${j.id}`).then(x => resolve(newer(x, live.jobs[j.id])), reject);
+    }, live.on ? 10000 : ms);
+    (live.waiters[j.id] ??= new Set()).add(waiter);
+  });
+}
+
+function onJob(j) {
+  if ((live.jobs[j.id]?.seq || 0) >= j.seq) return;
+  live.jobs[j.id] = j;
+  const waiters = live.waiters[j.id];
+  delete live.waiters[j.id];
+  waiters?.forEach(f => f(j));
+  if (j.status !== "running") return;
+  // Jobs started in another tab or on another device show here too.
+  if (j.kind === "notes" && !live.starting && !state.jobs.some(x => x.id === j.id)) {
+    const job = { id: j.id, label: j.label, message: j.message, status: "running", vid: j.vid, title: j.title, total: j.total, done: j.done, opened: true };
+    state.jobs.push(job);
+    renderList();
+    runJob(job, async () => j, true);
+  }
+  if (j.kind === "daily" && state.dailyPoll !== j.id) {
+    pollDaily(j.id);
+    loadDaily().then(() => { if (state.current === "today") openToday(true); }).catch(() => {});
+  }
+}
+
+// Changes come in bursts, so wait a moment and then reload each kind of data once.
+function onChange(kind, d) {
+  live.kinds.add(kind);
+  if (kind === "notes") live.notes.add(d.id);
+  if (kind === "highlights") live.marks.add(d.id);
+  if (kind === "learn") live.learn.add(d.id);
+  clearTimeout(live.timer);
+  live.timer = setTimeout(syncLive, 250);
+}
+
+async function syncLive() {
+  const kinds = new Set(live.kinds), notes = new Set(live.notes), marks = new Set(live.marks), learned = new Set(live.learn);
+  [live.kinds, live.notes, live.marks, live.learn].forEach(x => x.clear());
+  try {
+    await Promise.all([
+      kinds.has("notes") ? loadNotes() : null,
+      kinds.has("notes") || kinds.has("collections") ? loadCollections() : null,
+      kinds.has("daily") ? loadDaily() : null,
+    ]);
+  } catch { return; }
+  const cur = state.current;
+  if (cur === "today" && (kinds.has("daily") || state.daily?.picks.some(p => notes.has(p.id)))) return openToday(true);
+  if (cur?.startsWith("c:") && (kinds.has("notes") || kinds.has("collections"))) return openCollection(cur.slice(2), true);
+  const n = state.note;
+  if (!n || n.id !== cur) return;
+  const meta = state.notes.find(x => x.id === n.id);
+  if (!meta) {
+    // Deleted in another tab or on another device.
+    if (state.playing === n.id) $("#p-close").click();
+    const col = n.collections?.[0];
+    return col ? openCollection(col.id) : state.notes.length ? openNote(state.notes[0].id) : welcome();
+  }
+  if (notes.has(n.id)) {
+    if (meta.created !== n.created) return openNote(n.id);  // Written again, for example as Detailed notes.
+    if (JSON.stringify(meta.audio) !== JSON.stringify(n.audio)) {
+      state.note = { ...n, audio: meta.audio };
+      renderActions();
+    }
+  }
+  if (marks.has(n.id)) {
+    const fresh = await api(`/api/notes/${n.id}`).catch(() => null);
+    if (!fresh || state.note?.id !== n.id) return;
+    state.note.highlights = fresh.highlights;
+    document.querySelectorAll("mark.hl").forEach(m => m.replaceWith(...m.childNodes));
+    fresh.highlights.forEach(h => markText($("#md"), h.quote, h.id));
+    renderHighlights();
+  }
+  if (learned.has(n.id)) {
+    // A new quiz or a new answer from another tab or device. This tab's own request redraws itself when it ends.
+    const fresh = await api(`/api/notes/${n.id}`).catch(() => null);
+    if (!fresh || state.note?.id !== n.id) return;
+    if (state.quizBusy !== n.id && fresh.quiz?.created !== state.note.quiz?.created) {
+      state.note.quiz = fresh.quiz;
+      renderQuiz();
+    }
+    if (state.chatBusy !== n.id && JSON.stringify(fresh.chat) !== JSON.stringify(state.note.chat)) {
+      const draft = $("#ask-in")?.value || "";
+      state.note.chat = fresh.chat;
+      renderChat();
+      $("#ask-in").value = draft;
+    }
+  }
+}
+
+// After the stream drops, for example when the server restarts, anything can have changed.
+function resyncLive() {
+  ["notes", "collections", "daily"].forEach(kind => live.kinds.add(kind));
+  if (state.note) { live.notes.add(state.note.id); live.marks.add(state.note.id); live.learn.add(state.note.id); }
+  clearTimeout(live.timer);
+  live.timer = setTimeout(syncLive, 0);
+}
+
+function connectLive() {
+  if (!("EventSource" in window)) return;
+  const es = new EventSource("/api/events");
+  let opened = false;
+  es.onopen = () => { live.on = true; if (opened) resyncLive(); opened = true; };
+  es.onerror = () => { live.on = false; };
+  es.addEventListener("job", e => onJob(JSON.parse(e.data)));
+  ["notes", "highlights", "learn", "collections", "daily"].forEach(kind => es.addEventListener(kind, e => onChange(kind, JSON.parse(e.data))));
+}
 
 async function makeCards(n) {
   state.cardsBusy = n.id;
@@ -1563,6 +1873,7 @@ applyTheme();
 renderSeg();
 $("#p-speed").textContent = `${store.get("speed", 1)}×`;
 syncPlayer();
+connectLive();
 Promise.all([api("/api/voices").then(v => { state.voices = v; }), loadNotes(), loadCollections(), loadDaily().catch(() => null), resumeJobs().catch(() => null)]).then(() => {
   if (route()) return;
   if (state.daily?.sources.length) openToday();

@@ -86,6 +86,14 @@ To remember a note, select Make flashcards below its title. The model reads the 
 
 Select Flashcards below a note's title to study its cards that are due. Read the question, press Space to see the answer, and then grade yourself: 1 for Again, 2 for Good, or 3 for Easy. Cards that you know come back after a day, then three days, then less and less often. Cards that you miss come back in the same session. Your cards are saved on your Mac in `notes/flashcards.json`.
 
+## Quiz and questions
+
+To check what you understood, select Quiz me at the end of a note. The model writes a few multiple-choice questions about the note. Select an answer to see if it is right and why. Select Try again to answer the same questions again, or New questions to get a different set.
+
+To ask about something that is unclear, type a question under Ask about this note. The answer uses the note first. If the note does not cover the question, the answer says so before it uses general knowledge. Burmese notes get Burmese questions and answers.
+
+Quizzes and questions are saved on your Mac in `notes/learn.json`.
+
 ## Today: a daily watch list
 
 Today is a short list of new videos that are worth your time. It uses only the channels that you choose, so YouTube's recommendations do not decide what you see.
@@ -98,6 +106,14 @@ Today is a short list of new videos that are worth your time. It uses only the c
 Select Make notes to read a pick instead of watching it. While the server runs, it makes a new list once a day. Select Check again to make it now. The Chrome extension shows the same list above the library.
 
 To make the list from the command line, run `python3 ytnotes.py --daily`. The first time, it adds the channels of your notes.
+
+## Live updates
+
+Every open copy of the app stays up to date without a reload: browser tabs and the Chrome extension. When you make notes, add a highlight, record audio, delete a note or change your channels on one of them, the others show the change within a second. Notes that you start on one device show their progress on the others.
+
+The server sends these changes as [Server-Sent Events](https://developer.mozilla.org/docs/Web/API/Server-sent_events) on `/api/events`. If the connection drops, the app reconnects by itself and reloads what changed. While it is disconnected, it checks for progress the old way, every one or two seconds.
+
+Changes from the command line, for example `python3 ytnotes.py "https://youtu.be/VIDEO_ID"`, run in a separate process, so open apps show them after a reload.
 
 ## Use the Chrome extension
 
@@ -163,7 +179,9 @@ The project has these files and folders:
 | `tts.py` | The script that records audio with Kokoro. |
 | `ytlearn.py` | The video search and the playlist builder. |
 | `daily.py` | The daily watch list: your channels, their RSS feeds, and the picks. |
+| `events.py` | The live updates that the server sends to each open app. |
 | `library.py` | Search, highlights, and the Markdown and flashcard exports. |
+| `learn.py` | Quizzes and questions about a note. |
 | `context.py` | The code that gets chapters and reads article pages. |
 | `llm.py` | The code that sends prompts to agy, pi, or Claude Code. |
 | `assets/` | The app icon in SVG and PNG. |
