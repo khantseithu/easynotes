@@ -14,7 +14,6 @@
   "options_page": "options.html",
   "permissions": ["sidePanel", "storage", "contextMenus"],
   "host_permissions": ["http://127.0.0.1/*", "http://localhost/*", "https://www.youtube.com/*", "https://m.youtube.com/*"],
-  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "content_scripts": [
     { "matches": ["https://www.youtube.com/*", "https://m.youtube.com/*"], "js": ["content.js"], "run_at": "document_idle" }
   ],

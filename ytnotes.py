@@ -729,7 +729,6 @@ def daily_view():
 
 
 class Handler(BaseHTTPRequestHandler):
-    lan = False
     model = None
 
     def log_message(self, *args):
@@ -738,7 +737,7 @@ class Handler(BaseHTTPRequestHandler):
     def refused(self):
         host = self.headers.get("Host") or ""
         origin = self.headers.get("Origin")
-        foreign_host = not self.lan and urlparse(f"//{host}").hostname not in ("127.0.0.1", "localhost", "::1")
+        foreign_host = urlparse(f"//{host}").hostname not in ("127.0.0.1", "localhost", "::1")
         foreign_origin = (self.command != "GET" and origin is not None
                           and not origin.startswith("chrome-extension://") and urlparse(origin).netloc != host)
         if not (foreign_host or foreign_origin):
@@ -942,16 +941,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send(200, {"id": m.group(1), "deleted": True})
 
 
-def lan_ip():
-    import socket
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        try:
-            sock.connect(("10.255.255.255", 1))
-            return sock.getsockname()[0]
-        except OSError:
-            return "127.0.0.1"
-
-
 def main():
     ap = argparse.ArgumentParser(description="Read YouTube videos instead of watching them.")
     ap.add_argument("input", nargs="*", help="YouTube links, playlist links, or a topic; omit to open the app")
@@ -961,7 +950,6 @@ def main():
     ap.add_argument("--level", default="normal", choices=LEVELS, help="how much detail the notes keep")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true", help="don't open the browser")
-    ap.add_argument("--lan", action="store_true", help="also serve on your local network, e.g. for your phone")
     ap.add_argument("--audio", action="store_true", help="also record an audio version with Kokoro")
     ap.add_argument("--voice", default=VOICES[0][0], choices=[v for v, _ in VOICES])
     ap.add_argument("--daily", action="store_true",
@@ -1004,13 +992,10 @@ def main():
         return
 
     Handler.model = args.model
-    Handler.lan = args.lan
     threading.Thread(target=auto_daily, args=(args.model,), daemon=True).start()
-    server = ThreadingHTTPServer(("0.0.0.0" if args.lan else "127.0.0.1", args.port), Handler)
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     url = f"http://127.0.0.1:{args.port}"
     print(f"EasyNotes running at {url}  (Ctrl+C to stop)")
-    if args.lan:
-        print(f"On your phone (same Wi-Fi): http://{lan_ip()}:{args.port}")
     if not args.no_open:
         webbrowser.open(url)
     try:

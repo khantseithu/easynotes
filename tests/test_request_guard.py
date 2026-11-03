@@ -8,7 +8,6 @@ import ytnotes
 
 class RequestGuardTests(unittest.TestCase):
     def setUp(self):
-        self.addCleanup(setattr, ytnotes.Handler, "lan", ytnotes.Handler.lan)
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), ytnotes.Handler)
         self.server.RequestHandlerClass.log_message = lambda *a: None
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
@@ -34,6 +33,9 @@ class RequestGuardTests(unittest.TestCase):
         self.assertEqual(self.status("GET", "/api/voices"), 200)
         self.assertEqual(self.status("GET", "/api/voices", host="localhost:8765"), 200)
 
+    def test_a_network_address_cannot_read(self):
+        self.assertEqual(self.status("GET", "/api/voices", host="192.168.1.20:8765"), 403)
+
     def test_another_site_cannot_change_anything(self):
         for method in ("POST", "DELETE"):
             self.assertEqual(self.status(method, "/api/missing", Origin="https://evil.example"), 403)
@@ -43,12 +45,6 @@ class RequestGuardTests(unittest.TestCase):
         self.assertEqual(self.status("POST", "/api/missing", Origin=f"http://{self.local}"), 404)
         self.assertEqual(self.status("POST", "/api/missing", Origin="chrome-extension://abc"), 404)
         self.assertEqual(self.status("POST", "/api/missing"), 404)
-
-    def test_lan_mode_accepts_a_network_address_but_not_another_site(self):
-        ytnotes.Handler.lan = True
-        self.assertEqual(self.status("GET", "/api/voices", host="192.168.1.20:8765"), 200)
-        self.assertEqual(self.status("POST", "/api/missing", host="192.168.1.20:8765", Origin="http://192.168.1.20:8765"), 404)
-        self.assertEqual(self.status("POST", "/api/missing", host="192.168.1.20:8765", Origin="https://evil.example"), 403)
 
 
 if __name__ == "__main__":

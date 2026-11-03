@@ -46,8 +46,8 @@ uvx --from huggingface_hub hf download mlx-community/Kokoro-82M-bf16
 Get the code and start the server:
 
 ```bash
-git clone https://github.com/khantseithu/ytnotes.git
-cd ytnotes
+git clone https://github.com/khantseithu/easynotes.git
+cd easynotes
 python3 ytnotes.py
 ```
 
@@ -98,18 +98,6 @@ Today is a short list of new videos that are worth your time. It uses only the c
 Select Make notes to read a pick instead of watching it. While the server runs, it makes a new list once a day. Select Check again to make it now. The Chrome extension shows the same list above the library.
 
 To make the list from the command line, run `python3 ytnotes.py --daily`. The first time, it adds the channels of your notes.
-
-## Use the app on your phone
-
-Your phone and your Mac must be on the same Wi-Fi network. Start the server with the `--lan` flag:
-
-```bash
-python3 ytnotes.py --lan
-```
-
-The server shows a second address, for example `http://192.168.1.117:8765`. Open that address on your phone. On an iPhone, select Share and then Add to Home Screen to get an app icon.
-
-Use `--lan` only on a network that you trust. The app has no password, so each device on the network can open it. See [SECURITY.md](SECURITY.md).
 
 ## Use the Chrome extension
 
