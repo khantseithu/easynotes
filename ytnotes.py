@@ -822,7 +822,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(404, {"error": "not found"})
             return self.send(200, {**meta, "markdown": note_text(meta["id"]),
                                    "highlights": library.highlights_for(HIGHLIGHTS, meta["id"]),
-                                   "flashcards": len(library.load(FLASHCARDS).get(meta["id"], [])),
+                                   "flashcards": library.load(FLASHCARDS).get(meta["id"], []),
                                    "collections": note_collections(meta["id"])})
         if self.path == "/api/flashcards":
             return self.send(200, library.due_cards(FLASHCARDS, load_index(), datetime.now().date(),
