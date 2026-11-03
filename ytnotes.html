@@ -82,16 +82,20 @@ svg { display: block; flex: none; }
 
 .sidebar { position: fixed; inset: 0 auto 0 0; width: var(--side-w); background: var(--side); border-right: 1px solid var(--line);
            display: flex; flex-direction: column; z-index: 30; padding-bottom: var(--player-h); }
-.side-head { display: flex; align-items: center; gap: 8px; padding: 18px 16px 12px 20px; }
+.side-head { display: flex; align-items: center; gap: 4px; padding: 18px 12px 14px 20px; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -0.01em; font-size: 16px; margin-right: auto; }
 .brand img { width: 26px; height: 26px; display: block; }
 .brand b { color: var(--accent); font-weight: 650; }
 .welcome .mark { width: 64px; height: 64px; display: block; margin-bottom: 24px; }
 .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 9px; background: transparent; color: var(--muted); }
 .icon-btn:hover { background: var(--hover); color: var(--text); }
+.nav-btn { position: relative; }
+.nav-btn[aria-current="true"] { background: var(--accent-soft); color: var(--accent); }
+.nav-btn .badge { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; overflow: hidden; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--side); font-size: 0; }
+.nav-btn .badge:empty { display: none; }
 .close-side { display: none; }
 
-.composer { padding: 0 16px 16px; }
+.composer { padding: 0 16px 10px; }
 .field { display: flex; align-items: flex-end; gap: 6px; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 4px 4px 4px 12px;
          transition: border-color .15s, box-shadow .15s; }
 .field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -109,13 +113,14 @@ svg { display: block; flex: none; }
 .hint { font-size: 12.5px; color: var(--faint); margin: 8px 2px 0; }
 .hint.err { color: var(--danger); }
 
-.lib-head { display: flex; align-items: baseline; justify-content: space-between; padding: 6px 20px 6px; font-size: 12px; color: var(--muted); }
-.lib-head strong { font-weight: 600; color: var(--text); font-size: 13px; }
-.filter { margin: 0 16px 8px; display: none; }
+.filter { position: relative; margin: 0 16px 6px; display: none; }
 .filter.on { display: block; }
-.filter input { width: 100%; padding: 7px 10px; border-radius: 9px; border: 1px solid var(--line); background: transparent; font-size: 13.5px; outline: none; }
-.filter input:focus { border-color: var(--accent); }
-.list { list-style: none; margin: 0; padding: 0 8px 16px; overflow-y: auto; flex: 1; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in oklch, var(--muted) 58%, transparent) transparent; }
+.filter svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.filter input { width: 100%; padding: 7px 10px 7px 36px; border-radius: 9px; border: 1px solid transparent; background: transparent; font-size: 13.5px; outline: none; }
+.filter input::placeholder { color: var(--muted); }
+.filter input:hover { background: var(--hover); }
+.filter input:focus { background: var(--raised); border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.list { list-style: none; margin: 0; padding: 2px 8px 12px; overflow-y: auto; flex: 1; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in oklch, var(--muted) 58%, transparent) transparent; }
 @supports selector(::-webkit-scrollbar) {
   .list { scrollbar-width: auto; scrollbar-color: auto; }
   .list::-webkit-scrollbar { width: 7px; }
@@ -124,64 +129,58 @@ svg { display: block; flex: none; }
   .list::-webkit-scrollbar-thumb:hover { background: color-mix(in oklch, var(--accent) 70%, var(--muted)); }
   .list::-webkit-scrollbar-button, .list::-webkit-scrollbar-corner { display: none; }
 }
-.item { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 8px; border-radius: 10px; margin-bottom: 1px; }
-.folder-row { position: relative; display: flex; align-items: stretch; padding-left: 28px; }
-.channel-row { position: relative; display: flex; align-items: center; gap: 8px; padding: 10px 10px 6px; color: var(--muted); }
-.channel-toggle { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; padding: 0; background: none; color: inherit; text-align: left; }
+.list ul { list-style: none; margin: 0; padding: 0; }
+.item { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; border: 0; background: none; padding: 6px 8px 6px 26px; border-radius: 9px; font-size: 13.5px; line-height: 1.36; font-weight: 440; }
+.list.searching .item { padding-left: 8px; }
+.item:hover { background: var(--hover); }
+.item[aria-current="true"] { background: var(--accent-soft); font-weight: 560; }
+.item .w { flex: 1; min-width: 0; }
+.item .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.item .t:lang(my) { line-height: 1.7; }
+.item .r { color: var(--muted); font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; }
+.item .r svg { height: 18px; }
+.item[aria-current="true"] .r, .item .r.playing { color: var(--accent); }
+.item .s { color: var(--muted); font-size: 12px; font-weight: 400; margin-top: 2px; }
+.channel-toggle { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; padding: 12px 8px 5px; background: none; color: var(--text); font-size: 13px; font-weight: 600; text-align: left; }
+.channel-toggle[aria-expanded="false"] { padding: 7px 8px; color: var(--muted); font-weight: 500; }
 .channel-toggle:hover { color: var(--text); }
 .channel-toggle:disabled { cursor: default; }
-.channel-toggle span:first-child { display: inline-block; transition: transform .15s; }
-.channel-toggle[aria-expanded="true"] span:first-child { transform: rotate(90deg); }
-.channel-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
-.channel-count { margin-left: auto; font-size: 11px; color: var(--faint); }
-.sort-row { display: flex; align-items: stretch; }
-.sort-row > .item { width: auto; flex: 1; min-width: 0; }
-.sort-handle { width: 22px; flex: none; border: 0; border-radius: 8px; padding: 0; background: transparent; color: var(--faint); cursor: grab; font-size: 16px; touch-action: none; }
-.sort-handle:hover { background: var(--hover); color: var(--text); }
-.sort-handle:active { cursor: grabbing; }
-.sort-handle[hidden] { display: none; }
-.sort-row.dragging { opacity: .45; }
-.sort-row.drop-before { box-shadow: inset 0 2px var(--accent); }
-.sort-row.drop-after { box-shadow: inset 0 -2px var(--accent); }
-.folder-row > .item { width: auto; flex: 1; min-width: 0; padding-right: 8px; }
-.folder-toggle { position: absolute; top: 4px; left: 0; width: 28px; height: 28px; border: 0; border-radius: 9px; background: none; color: var(--muted); }
+.channel-toggle svg { color: var(--muted); transition: transform .15s; }
+.channel-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+.channel-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.channel-count { margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.folder-row { position: relative; }
+.folder-row > .item { padding-right: 36px; }
+.folder-toggle { position: absolute; top: 2px; right: 2px; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--muted); }
 .folder-toggle:hover { background: var(--hover); color: var(--text); }
-.folder-toggle span { display: inline-block; transition: transform .15s; }
-.folder-toggle[aria-expanded="true"] span { transform: rotate(90deg); }
-.folder-actions { position: absolute; right: 4px; bottom: 3px; display: flex; align-items: center; }
-.folder-actions .sort-handle { width: 24px; height: 26px; }
-.folder-actions .sort-handle { font-size: 14px; }
-.folder-meta { padding-right: 32px; gap: 0 8px; }
-@media (hover: hover) and (pointer: fine) {
-  .folder-actions { opacity: 0; pointer-events: none; }
-  .folder-row:hover .folder-actions, .folder-row:focus-within .folder-actions { opacity: 1; pointer-events: auto; }
-}
+.folder-toggle svg { transition: transform .15s; }
+.folder-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+.folder-children .item { padding-left: 40px; }
+.list.searching .folder-children .item { padding-left: 22px; }
+mark.hit { background: none; color: var(--accent); font-weight: 600; }
+.side-foot { display: none; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 20px 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.side-foot.on { display: flex; }
+.side-foot a { display: flex; align-items: center; gap: 5px; color: inherit; text-decoration: none; }
+.side-foot a:hover { color: var(--text); }
 @media (hover: none), (pointer: coarse) {
-  .folder-toggle { height: 44px; }
-  .channel-row { padding-top: 4px; padding-bottom: 4px; }
-  .channel-toggle { min-height: 44px; }
-  .folder-actions .sort-handle { width: 44px; height: 44px; }
-  .folder-actions { bottom: 8px; }
-  .folder-meta { min-height: 44px; align-items: center; padding-right: 52px; }
+  .item { min-height: 44px; padding-top: 9px; padding-bottom: 9px; font-size: 14.5px; }
+  .channel-toggle, .channel-toggle[aria-expanded="false"] { min-height: 44px; padding-top: 6px; padding-bottom: 6px; }
+  .folder-row > .item { padding-right: 48px; }
+  .folder-toggle { top: 0; right: 0; width: 44px; height: 44px; }
+  .filter input { padding-top: 11px; padding-bottom: 11px; }
+  .side-foot { padding-top: 0; padding-bottom: 0; }
+  .side-foot a, .side-foot span { min-height: 44px; display: flex; align-items: center; }
+  .side-head .icon-btn { width: 44px; height: 44px; }
 }
-.folder-children { list-style: none; margin: 0 0 4px 12px; padding: 0 0 0 8px; border-left: 1px solid var(--line); }
-.folder-children .item { padding: 8px 10px; }
-.item:hover { background: var(--hover); }
-.item[aria-current="true"] { background: var(--accent-soft); }
-.item .t { font-weight: 560; font-size: 14px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.item .m { display: flex; flex-wrap: wrap; gap: 0 8px; color: var(--muted); font-size: 12px; margin-top: 3px; }
-.item .m > span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.item .m .dot::before { content: "·"; margin-right: 8px; color: var(--faint); }
-.item .playing { color: var(--accent); font-weight: 600; }
-.job { padding: 10px 12px; border-radius: 10px; background: var(--raised); border: 1px dashed var(--line); margin-bottom: 6px; }
-.job .t { font-size: 13.5px; font-weight: 560; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.job .m { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 4px; }
-.job.err { border-style: solid; border-color: var(--danger); }
-.job.err .m { color: var(--danger); }
+.job { display: flex; align-items: center; gap: 10px; padding: 4px 8px 8px; margin-bottom: 2px; border-bottom: 1px solid var(--line); }
+.job-body { flex: 1; min-width: 0; }
+.job .t { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job .m { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 1px; }
+.job.err .m, .job.err .t { color: var(--danger); }
 .job .bar { height: 3px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
 .job .bar i { display: block; height: 100%; background: var(--accent); transition: width .4s var(--ease); }
-.lib-label { padding: 14px 12px 4px; font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
-.lib-label:first-child { padding-top: 4px; }
+.lib-label { margin-top: 8px; padding: 14px 8px 5px; border-top: 1px solid var(--line); font-size: 13px; font-weight: 500; color: var(--muted); }
+.lib-label:first-child { margin-top: 0; padding-top: 4px; border-top: 0; }
 .job .x { margin-left: auto; border: 0; background: none; color: var(--muted); font-size: 12px; padding: 2px 4px; }
 .spin { width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; flex: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -226,7 +225,6 @@ h1 { font-family: var(--sans); font-size: 30px; line-height: 1.18; letter-spacin
 .btn.danger:hover { filter: brightness(1.06); }
 .act-msg.err { color: var(--danger); }
 .actions a.btn[download] { color: var(--muted); }
-.end-mark { height: 1px; margin-top: 8px; }
 
 mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color: inherit; border-radius: 3px; padding: 1px 0; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .hl-bar { position: fixed; z-index: 40; display: none; flex-direction: column; gap: 8px; padding: 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--raised); box-shadow: var(--shadow); transform: translateX(-50%); }
@@ -237,6 +235,20 @@ mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color
 .hl-bar textarea:focus { border-color: var(--accent); }
 .hl-bar .msg { font-size: 12.5px; color: var(--danger); margin: 0; }
 
+.fc-list { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); font-family: var(--sans); }
+.fc-list h2 { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 10px; }
+.fc-list > p { font-size: 14.5px; color: var(--muted); margin: 0 0 14px; }
+.fc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 6px; }
+.fc-head h2 { margin: 0; margin-right: auto; }
+.fc-head .btn { height: 32px; padding: 0 12px; font-size: 13px; }
+.fc-item { border-bottom: 1px solid var(--line); }
+.fc-item summary { list-style: none; cursor: pointer; display: flex; gap: 12px; align-items: baseline; padding: 14px 0; font-family: var(--serif); font-size: 17px; line-height: 1.5; }
+.fc-item summary::-webkit-details-marker { display: none; }
+.fc-item summary::after { content: "Show"; margin-left: auto; flex-shrink: 0; font: 12.5px var(--sans); color: var(--muted); }
+.fc-item[open] summary::after { content: "Hide"; }
+.fc-item summary:hover::after { color: var(--accent); }
+.fc-item summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.fc-item p { margin: -4px 0 16px; padding-left: 12px; border-left: 2px solid var(--accent); font-family: var(--serif); font-size: 16px; line-height: 1.55; color: var(--muted); }
 .hl-list { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); font-family: var(--sans); }
 .hl-list h2 { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 10px; }
 .hl-item { padding: 14px 0; border-bottom: 1px solid var(--line); }
@@ -246,16 +258,6 @@ mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color
 .hl-item .btn:hover { color: var(--danger); border-color: var(--danger); }
 
 .item .snip { margin-top: 3px; font-size: 12.5px; line-height: 1.45; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.unread { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
-.filter-row { display: flex; gap: 6px; }
-.filter-row input { flex: 1; min-width: 0; }
-.chip { flex: none; height: 33px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line); background: none; font-size: 12.5px; color: var(--muted); }
-.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: transparent; color: var(--text); }
-.lib-head { flex-wrap: wrap; row-gap: 2px; }
-.lib-head > span { white-space: nowrap; }
-.lib-links { margin-left: auto; white-space: nowrap; }
-.lib-links a { padding-left: 12px; color: var(--accent); text-decoration: none; }
-.lib-links a:hover { text-decoration: underline; }
 
 .learn { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); font-family: var(--sans); }
 .learn h2 { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 10px; }
@@ -357,12 +359,15 @@ mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color
 .video.pending h3, .video.skipped h3 { color: var(--muted); font-weight: 560; }
 .video .st { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-top: 6px; }
 .video.skipped .st { color: var(--danger); }
-.today-nav { padding: 0 12px 10px; }
 .flash { margin-top: 28px; padding: 28px 26px; border: 1px solid var(--line); border-radius: 14px; background: var(--raised); }
-.flash .from { font-size: 12.5px; color: var(--muted); margin-bottom: 14px; }
-.flash .from a { color: inherit; }
 .flash .q { font-family: var(--serif); font-size: 21px; line-height: 1.45; margin: 0; }
 .flash .a { font-family: var(--serif); font-size: 18px; line-height: 1.6; margin: 20px 0 0; padding-top: 20px; border-top: 1px solid var(--line); }
+.fc-study { padding: 4px 0 24px; border-bottom: 1px solid var(--line); }
+.fc-study .flash { margin-top: 20px; }
+.fc-study-head { display: flex; align-items: center; gap: 10px; margin-top: 20px; font-size: 13px; color: var(--muted); }
+.fc-study-head b { color: var(--text); font-weight: 650; margin-right: auto; }
+.fc-study-head .btn { height: 30px; padding: 0 10px; font-size: 12.5px; }
+.fc-study .col-note { margin-top: 12px; }
 .flash-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 18px; }
 .flash-row .btn { flex: 1; justify-content: center; min-width: 96px; }
 .flash-row kbd { font: 11px var(--sans); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
@@ -458,7 +463,6 @@ mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color
   .glossary dd { border-top: 0; padding-top: 0; }
   .player { padding-left: 12px; padding-right: 12px; }
   .p-skip.back, .p-skip.fwd { display: none; }
-  .item { padding: 12px; }
   .actions #listen { flex: 1 1 100%; justify-content: center; height: 44px; }
   .actions .voice { flex: 1; height: 42px; }
   .actions .btn:not(.primary) { height: 42px; }
@@ -475,7 +479,8 @@ mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color
 <body>
 <aside class="sidebar" id="sidebar" aria-label="Library">
   <div class="side-head">
-    <div class="brand"><img src="/assets/icon.svg" alt=""><span>YT <b>Notes</b></span></div>
+    <div class="brand"><img src="/assets/icon.svg" alt=""><span>Easy<b>Notes</b></span></div>
+    <button class="icon-btn nav-btn" id="today-btn" aria-current="false" aria-label="Today" title="Today"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span class="badge" id="today-meta"></span></button>
     <button class="icon-btn" id="theme" aria-label="Change theme"></button>
     <button class="icon-btn close-side" id="close-side" aria-label="Close library">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -484,7 +489,7 @@ mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color
   <form class="composer" id="composer" autocomplete="off">
     <label class="vh" for="in">YouTube link, article link, or topic</label>
     <div class="field">
-      <textarea id="in" rows="1" placeholder="YouTube or article links, or a topic" enterkeyhint="go"></textarea>
+      <textarea id="in" rows="1" placeholder="Paste a link or a topic" enterkeyhint="go"></textarea>
       <button class="go" id="go" disabled aria-label="Make notes" title="Make notes (Enter)">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </button>
@@ -508,10 +513,9 @@ mark.hl { background: color-mix(in oklch, var(--accent) 26%, transparent); color
     </div>
     <p class="hint" id="hint" aria-live="polite"></p>
   </form>
-  <div class="today-nav"><button class="item" id="today-btn" aria-current="false"><div class="t">Today</div><div class="m" id="today-meta">New videos worth watching</div></button><button class="item" id="review-btn" aria-current="false"><div class="t">Review</div><div class="m" id="review-meta">Flashcards from your notes</div></button></div>
-  <div class="lib-head"><strong>Library</strong><span id="lib-stats"></span><span class="lib-links"><a href="/api/export.zip" download>Export all</a><a href="/api/export/flashcards.csv" download>Flashcards</a></span></div>
-  <div class="filter" id="filter"><label class="vh" for="q">Search notes</label><div class="filter-row"><input id="q" type="search" placeholder="Search notes"><button type="button" class="chip" id="unread-only" aria-pressed="false">Unread</button></div></div>
+  <div class="filter" id="filter"><label class="vh" for="q">Search notes</label><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.8-3.8"/></svg><input id="q" type="search" placeholder="Search notes"></div>
   <ul class="list" id="list" aria-live="polite"></ul>
+  <div class="side-foot" id="side-foot"><span id="lib-stats"></span><a href="/api/export.zip" download><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Export all</a></div>
 </aside>
 <div class="scrim" id="scrim"></div>
 
@@ -596,7 +600,6 @@ const ICON = {
   ext: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>`,
   system: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>`,
   light: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`,
-  check: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
   download: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>`,
   cards: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="14" height="13" rx="2"/><path d="M7 4h12a2 2 0 0 1 2 2v11"/></svg>`,
   trash: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>`,
@@ -605,7 +608,7 @@ const ICON = {
 const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
 const EXAMPLES = ["saas distribution", "founder-led sales", "pricing strategy", "product-led growth"];
 
-const state = { notes: [], collections: [], voices: [], current: null, note: null, jobs: [], minutes: store.get("minutes", 60), level: store.get("level", "normal"), q: "", playing: null, expandedFolders: store.get("expandedFolders", {}), expandedChannels: store.get("expandedChannels", {}), folderOrder: store.get("folderOrder", []), noteOrder: store.get("noteOrder", []), pinnedItems: store.get("pinnedItems", []), unreadOnly: store.get("unreadOnly", false), hits: [] };
+const state = { notes: [], collections: [], voices: [], current: null, note: null, jobs: [], minutes: store.get("minutes", 60), level: store.get("level", "normal"), q: "", playing: null, expandedFolders: store.get("expandedFolders", {}), expandedChannels: store.get("expandedChannels", {}), pinnedItems: store.get("pinnedItems", []), hits: [] };
 
 function applyTheme() {
   const t = store.get("theme", "system");
@@ -658,12 +661,6 @@ function searchText() {
     renderList();
   }, 200);
 }
-$("#unread-only").onclick = e => {
-  state.unreadOnly = !state.unreadOnly;
-  store.set("unreadOnly", state.unreadOnly);
-  e.currentTarget.setAttribute("aria-pressed", state.unreadOnly);
-  renderList();
-};
 
 // The toolbar that appears when text in a note is selected.
 const hlBar = $("#hl-bar"), hlForm = $("#hl-form"), hlText = $("#hl-text"), hlMsg = $("#hl-msg");
@@ -719,19 +716,15 @@ function renderList() {
   const pinKey = (kind, id) => `${kind}:${id}`;
   const isPinned = (kind, id) => state.pinnedItems.includes(pinKey(kind, id));
   const timestamp = item => Date.parse(item.created || "") || 0;
-  const ordered = (items, key, kind, date = timestamp) => {
-    const order = state[key], rank = new Map(order.map((id, i) => [id, i]));
-    return [...items].sort((a, b) => Number(isPinned(kind, b.id)) - Number(isPinned(kind, a.id)) || (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER) || date(b) - date(a));
-  };
+  const ordered = (items, kind, date = timestamp) => [...items].sort((a, b) => Number(isPinned(kind, b.id)) - Number(isPinned(kind, a.id)) || date(b) - date(a));
   const match = x => !state.q || (x.title + " " + (x.channel || "")).toLowerCase().includes(state.q);
-  const unreadOk = x => !state.unreadOnly || !x.read_at;
   const playlistNoteIds = new Set(state.collections.filter(c => c.kind === "playlist").flatMap(c => (c.videos || []).map(v => v.id)));
-  const notes = ordered(state.notes.filter(n => !playlistNoteIds.has(n.id)), "noteOrder", "note");
+  const notes = ordered(state.notes.filter(n => !playlistNoteIds.has(n.id)), "note");
   const noteById = new Map(state.notes.map(n => [n.id, n]));
   const collectionDate = c => Math.max(timestamp(c), ...(c.videos || []).map(v => timestamp(noteById.get(v.id) || {})));
-  const cols = ordered(state.collections, "folderOrder", "folder", collectionDate).map(c => {
-    const children = (c.videos || []).filter(v => v.read_mins && (!state.q || (v.title + " " + (v.channel || "")).toLowerCase().includes(state.q)) && unreadOk(noteById.get(v.id) || {}));
-    return { ...c, children, matches: (match(c) && !state.unreadOnly) || children.length > 0, channelName: (c.channel || "").trim() || (c.kind === "topic" ? "Topics" : "Other") };
+  const cols = ordered(state.collections, "folder", collectionDate).map(c => {
+    const children = (c.videos || []).filter(v => v.read_mins && (!state.q || (v.title + " " + (v.channel || "")).toLowerCase().includes(state.q)));
+    return { ...c, children, matches: match(c) || children.length > 0, channelName: (c.channel || "").trim() || (c.kind === "topic" ? "Topics" : "Other") };
   });
   const channelName = n => (n.channel || "").trim() || "Other";
   const channels = new Map();
@@ -740,57 +733,63 @@ function renderList() {
     channels.get(name)[type].push(item);
   };
   cols.forEach(c => { if (c.matches) addToChannel(c.channelName, "collections", c); });
-  notes.forEach(n => { if (match(n) && unreadOk(n)) addToChannel(channelName(n), "notes", n); });
+  notes.forEach(n => { if (match(n)) addToChannel(channelName(n), "notes", n); });
   const saved = state.notes.reduce((a, n) => a + Math.max(0, n.secs - n.read_mins * 60), 0);
-  $("#lib-stats").textContent = state.notes.length ? `${state.notes.length} notes${saved ? ` · ${dur(saved)} saved` : ""}` : "";
-  $("#filter").classList.toggle("on", state.notes.length > 0 || state.collections.length > 0);
-  const textHits = state.q.trim().length >= 2 ? state.hits.filter(h => unreadOk(noteById.get(h.id) || {})) : [];
+  $("#lib-stats").textContent = saved ? `${dur(saved)} saved` : "";
+  const hasLibrary = state.notes.length > 0 || state.collections.length > 0;
+  $("#filter").classList.toggle("on", hasLibrary);
+  $("#side-foot").classList.toggle("on", hasLibrary);
+  $("#q").placeholder = `Search ${state.notes.length} note${state.notes.length === 1 ? "" : "s"}`;
+  $("#list").classList.toggle("searching", !!state.q);
+  const hl = text => {
+    const q = state.q.trim();
+    if (!q) return esc(text);
+    return String(text).split(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "ig")).map((part, i) => i % 2 ? `<mark class="hit">${esc(part)}</mark>` : esc(part)).join("");
+  };
+  const lane = (id, mins) => state.playing === id
+    ? `<span class="r playing"><span class="vh">Playing</span><svg width="14" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="4" y="9" width="3.4" height="10" rx="1"/><rect x="10.3" y="4" width="3.4" height="15" rx="1"/><rect x="16.6" y="11" width="3.4" height="8" rx="1"/></svg></span>`
+    : `<span class="r"><span aria-hidden="true">${mins}m</span><span class="vh">${mins} min read</span></span>`;
+  const textHits = state.q.trim().length >= 2 ? state.hits : [];
   const hitItems = textHits.length ? `<li class="lib-label">In note text</li>` + textHits.map(h => `
-    <li><button class="item" data-id="${esc(h.id)}" aria-current="${h.id === state.current}"><div class="t">${esc(h.title)}</div><div class="snip">${esc(h.snippet)}</div></button></li>`).join("") : "";
+    <li><button class="item" data-id="${esc(h.id)}" aria-current="${h.id === state.current}"><span class="w"><div class="t">${esc(h.title)}</div><div class="snip">${hl(h.snippet)}</div></span></button></li>`).join("") : "";
   const jobs = state.jobs.map(j => `
     <li class="job ${j.status === "error" ? "err" : ""}">
-      <div class="t">${esc(j.title || j.label)}</div>
-      <div class="m">${j.status === "error" ? "" : `<div class="spin"></div>`}<span>${esc(j.message)}</span>
-        ${j.status === "error" ? `<button class="x" data-dismiss="${j.id}">Dismiss</button>` : ""}</div>
-      ${j.total > 1 && j.status !== "error" ? `<div class="bar"><i style="width:${Math.round(100 * (j.done || 0) / j.total)}%"></i></div>` : ""}
+      ${j.status === "error" ? "" : `<div class="spin"></div>`}
+      <div class="job-body">
+        <div class="t">${esc(j.title || j.label)}</div>
+        <div class="m"><span>${esc(j.message)}</span>
+          ${j.status === "error" ? `<button class="x" data-dismiss="${j.id}">Dismiss</button>` : ""}</div>
+        ${j.total > 1 && j.status !== "error" ? `<div class="bar"><i style="width:${Math.round(100 * (j.done || 0) / j.total)}%"></i></div>` : ""}
+      </div>
     </li>`).join("");
-  const renderCollection = (c, channel) => {
+  const renderCollection = c => {
     const forcedOpen = !!state.q && c.children.length > 0;
     const expanded = forcedOpen || (Object.hasOwn(state.expandedFolders, c.id) ? !!state.expandedFolders[c.id] : false);
+    const kind = c.kind === "topic" ? "Topic" : "Playlist";
     return `<li>
-      <div class="folder-row sort-row" data-sortable="folder" data-sort-id="${esc(c.id)}" data-sort-group="${esc(channel)}">
-        <button class="folder-toggle" data-folder="${esc(c.id)}" aria-label="${forcedOpen ? `${esc(c.title)}, expanded while filtering` : `${expanded ? "Collapse" : "Expand"} ${esc(c.title)}`}" aria-expanded="${expanded}" ${forcedOpen ? 'disabled title="Clear search to collapse"' : ""}><span>›</span></button>
+      <div class="folder-row">
         <button class="item" data-col="${esc(c.id)}" aria-current="${state.current === "c:" + c.id}">
-          <div class="t">${esc(c.title)}</div>
-          <div class="m folder-meta"><span>${c.ready < c.count ? `${c.ready} of ${c.count} notes` : `${c.count} videos`}</span>${
-            c.read_mins ? `<span>${c.read_mins} min read</span>` : ""}</div>
+          <span class="w"><div class="t">${hl(c.title)}</div><div class="s">${kind} · ${c.ready < c.count ? `${c.ready} of ${c.count} notes` : `${c.count} videos`}</div></span>
         </button>
-        <div class="folder-actions">
-          <button class="sort-handle" data-drag-handle aria-label="Reorder ${esc(c.title)}. Use arrow keys to move" title="Drag or use ↑/↓ to reorder" draggable="true" ${state.q ? "hidden" : ""}>⠿</button>
-        </div>
+        <button class="folder-toggle" data-folder="${esc(c.id)}" aria-label="${forcedOpen ? `${esc(c.title)}, expanded while filtering` : `${expanded ? "Collapse" : "Expand"} ${esc(c.title)}`}" aria-expanded="${expanded}" ${forcedOpen ? 'disabled title="Clear search to collapse"' : ""}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
       </div>
-      ${expanded && c.children.length ? `<ul class="folder-children">${c.children.map(v => `<li><button class="item" data-id="${esc(v.id)}" aria-current="${v.id === state.current}"><div class="t">${esc(v.title)}</div><div class="m">${esc(v.channel || "")}<span class="dot">${v.read_mins} min read</span></div></button></li>`).join("")}</ul>` : ""}
+      ${expanded && c.children.length ? `<ul class="folder-children">${c.children.map(v => `<li><button class="item" data-id="${esc(v.id)}" aria-current="${v.id === state.current}"><span class="w"><div class="t">${hl(v.title)}</div></span>${lane(v.id, v.read_mins)}</button></li>`).join("")}</ul>` : ""}
     </li>`;
   };
-  const renderNote = (n, channel) => `
-    <li class="sort-row" data-sortable="note" data-sort-id="${esc(n.id)}" data-sort-group="${esc(channel)}"><button class="sort-handle" data-drag-handle aria-label="Reorder ${esc(n.title)}. Use arrow keys to move" title="Drag or use ↑/↓ to reorder" draggable="true" ${state.q ? "hidden" : ""}>⠿</button><button class="item" data-id="${esc(n.id)}" aria-current="${n.id === state.current}">
-      <div class="t">${n.read_at ? "" : `<span class="unread" aria-hidden="true"></span><span class="vh">Unread: </span>`}${esc(n.title)}</div>
-      <div class="m"><span>${esc(n.channel)}</span><span class="dot">${n.read_mins} min read</span>${
-        state.playing === n.id ? `<span class="dot playing">Playing</span>` : n.audio && n.language !== "my" ? `<span class="dot">Audio</span>` : ""}</div>
-    </button></li>`;
+  const renderNote = n => `
+    <li><button class="item" data-id="${esc(n.id)}" aria-current="${n.id === state.current}"><span class="w"><div class="t"${n.language === "my" ? ' lang="my"' : ""}>${hl(n.title)}</div></span>${lane(n.id, n.read_mins)}</button></li>`;
   const channelDate = channel => Math.max(0, ...channel.notes.map(timestamp), ...channel.collections.map(collectionDate), ...state.notes.filter(n => channelName(n) === channel.name).map(timestamp));
   const sections = [...channels.values()].sort((a, b) => channelDate(b) - channelDate(a) || a.name.localeCompare(b.name)).map(channel => {
     const key = channel.name;
     const forcedOpen = !!state.q;
     const expanded = forcedOpen || !Object.hasOwn(state.expandedChannels, key) || !!state.expandedChannels[key];
     const count = channel.notes.length + channel.collections.length;
-    const collectionItems = channel.collections.map(c => renderCollection(c, key)).join("");
-    const noteItems = channel.notes.map(n => renderNote(n, key)).join("");
-    return `<li><div class="channel-row"><button class="channel-toggle" data-channel="${esc(key)}" aria-label="${forcedOpen ? `${esc(key)}, expanded while filtering` : `${expanded ? "Collapse" : "Expand"} ${esc(key)}`}" aria-expanded="${expanded}" ${forcedOpen ? 'disabled title="Clear search to collapse"' : ""}><span>›</span><span class="channel-name">${esc(key)}</span><span class="channel-count">${count}</span></button></div>${expanded ? `<ul class="folder-children">${collectionItems}${noteItems}</ul>` : ""}</li>`;
+    const collectionItems = channel.collections.map(renderCollection).join("");
+    const noteItems = channel.notes.map(renderNote).join("");
+    return `<li><div class="channel-row"><button class="channel-toggle" data-channel="${esc(key)}" aria-label="${forcedOpen ? `${esc(key)}, expanded while filtering` : `${expanded ? "Collapse" : "Expand"} ${esc(key)}`}" aria-expanded="${expanded}" ${forcedOpen ? 'disabled title="Clear search to collapse"' : ""}>${forcedOpen ? "" : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`}<span class="channel-name">${esc(key)}</span><span class="channel-count">${count}</span></button></div>${expanded ? `<ul>${collectionItems}${noteItems}</ul>` : ""}</li>`;
   }).join("");
-  $("#list").innerHTML = jobs + hitItems + (sections || (state.jobs.length || hitItems ? "" : `<li class="empty-lib">${state.q ? "No notes match." : "Notes you make will appear here."}</li>`));
+  $("#list").innerHTML = jobs + sections + hitItems + (sections || state.jobs.length || hitItems ? "" : `<li class="empty-lib">${state.q ? "No notes match." : "Notes you make will appear here."}</li>`);
   todayMeta();
-  reviewMeta();
 }
 function togglePin(kind, id) {
   const key = `${kind}:${id}`;
@@ -829,70 +828,6 @@ $("#list").onclick = e => {
   const b = e.target.closest(".item");
   if (b) { openNote(b.dataset.id); side(false); }
 };
-const clearDropMarks = () => document.querySelectorAll(".sort-row.drop-before, .sort-row.drop-after").forEach(row => row.classList.remove("drop-before", "drop-after"));
-const reorderRows = (kind, fromId, toId, after) => {
-  if (fromId === toId) return;
-  if (state.pinnedItems.includes(`${kind}:${fromId}`) !== state.pinnedItems.includes(`${kind}:${toId}`)) return;
-  const key = kind === "folder" ? "folderOrder" : "noteOrder";
-  const fromRow = document.querySelector(`[data-sortable="${kind}"][data-sort-id="${CSS.escape(fromId)}"]`);
-  const toRow = document.querySelector(`[data-sortable="${kind}"][data-sort-id="${CSS.escape(toId)}"]`);
-  if (!fromRow || !toRow || fromRow.dataset.sortGroup !== toRow.dataset.sortGroup) return;
-  const group = fromRow.dataset.sortGroup;
-  const rows = [...document.querySelectorAll(`[data-sortable="${kind}"]`)].filter(row => row.dataset.sortGroup === group && state.pinnedItems.includes(`${kind}:${row.dataset.sortId}`) === state.pinnedItems.includes(`${kind}:${fromId}`));
-  const ids = rows.map(row => row.dataset.sortId);
-  if (!ids.includes(fromId) || !ids.includes(toId)) return;
-  const from = ids.indexOf(fromId), target = ids.indexOf(toId);
-  if (from < 0 || target < 0) return;
-  ids.splice(from, 1);
-  let at = ids.indexOf(toId) + (after ? 1 : 0);
-  ids.splice(at, 0, fromId);
-  const groupIds = new Set(ids);
-  state[key] = [...state[key].filter(id => !groupIds.has(id)), ...ids];
-  store.set(key, state[key]);
-  renderList();
-};
-$("#list").addEventListener("keydown", e => {
-  const handle = e.target.closest("[data-drag-handle]");
-  if (!handle || state.q || !["ArrowUp", "ArrowDown"].includes(e.key)) return;
-  e.preventDefault();
-  const row = handle.closest("[data-sortable]");
-  const pinned = state.pinnedItems.includes(`${row.dataset.sortable}:${row.dataset.sortId}`);
-  const group = [...document.querySelectorAll(`[data-sortable="${row.dataset.sortable}"]`)].filter(item => item.dataset.sortGroup === row.dataset.sortGroup && state.pinnedItems.includes(`${item.dataset.sortable}:${item.dataset.sortId}`) === pinned);
-  const index = group.indexOf(row), next = group[index + (e.key === "ArrowUp" ? -1 : 1)];
-  if (!next) return;
-  reorderRows(row.dataset.sortable, row.dataset.sortId, next.dataset.sortId, e.key === "ArrowDown");
-  $(`[data-sortable="${row.dataset.sortable}"][data-sort-id="${CSS.escape(row.dataset.sortId)}"] [data-drag-handle]`).focus();
-});
-$("#list").addEventListener("dragstart", e => {
-  const handle = e.target.closest("[data-drag-handle]");
-  const row = handle?.closest("[data-sortable]");
-  if (!row || state.q) return e.preventDefault();
-  e.dataTransfer.effectAllowed = "move";
-  e.dataTransfer.setData("text/plain", JSON.stringify({ kind: row.dataset.sortable, id: row.dataset.sortId }));
-  row.classList.add("dragging");
-});
-$("#list").addEventListener("dragover", e => {
-  const row = e.target.closest("[data-sortable]");
-  const dragged = document.querySelector(".sort-row.dragging");
-  if (!row || !dragged || row.dataset.sortable !== dragged.dataset.sortable || row.dataset.sortGroup !== dragged.dataset.sortGroup || row === dragged) { clearDropMarks(); return; }
-  if (state.q) { clearDropMarks(); e.dataTransfer.dropEffect = "none"; return; }
-  if (state.pinnedItems.includes(`${row.dataset.sortable}:${row.dataset.sortId}`) !== state.pinnedItems.includes(`${dragged.dataset.sortable}:${dragged.dataset.sortId}`)) { clearDropMarks(); e.dataTransfer.dropEffect = "none"; return; }
-  e.preventDefault();
-  e.dataTransfer.dropEffect = "move";
-  clearDropMarks();
-  row.classList.add(e.clientY < row.getBoundingClientRect().top + row.offsetHeight / 2 ? "drop-before" : "drop-after");
-});
-$("#list").addEventListener("drop", e => {
-  const row = e.target.closest("[data-sortable]");
-  const dragged = document.querySelector(".sort-row.dragging");
-  if (state.q || !row || !dragged || row.dataset.sortable !== dragged.dataset.sortable || row.dataset.sortGroup !== dragged.dataset.sortGroup || row === dragged) return;
-  if (state.pinnedItems.includes(`${row.dataset.sortable}:${row.dataset.sortId}`) !== state.pinnedItems.includes(`${dragged.dataset.sortable}:${dragged.dataset.sortId}`)) return;
-  e.preventDefault();
-  const after = e.clientY >= row.getBoundingClientRect().top + row.offsetHeight / 2;
-  reorderRows(row.dataset.sortable, dragged.dataset.sortId, row.dataset.sortId, after);
-});
-$("#list").addEventListener("dragend", () => { clearDropMarks(); document.querySelectorAll(".sort-row.dragging").forEach(row => row.classList.remove("dragging")); });
-
 async function loadNotes() { state.notes = await api("/api/notes"); renderList(); }
 async function loadCollections() { state.collections = await api("/api/collections"); renderList(); }
 
@@ -1152,6 +1087,7 @@ $("#toc").addEventListener("click", e => {
 async function openNote(id) {
   state.current = id;
   state.confirmDelete = null;
+  state.review = null;
   hideHlBar();
   history.replaceState(null, "", `#${id}`);
   renderList();
@@ -1169,8 +1105,9 @@ async function openNote(id) {
     <div class="kicker"><span>${esc(n.channel)}</span>${n.kind === "article" ? `<span>Article</span>` : `<span>${dur(n.secs)} video</span>`}<span>${n.read_mins} min read</span>${saved ? `<span class="saved">${dur(saved)} saved</span>` : ""}</div>
     <h1>${esc(n.title)}</h1>
     <div class="actions" id="actions"></div>
+    <section class="fc-study" id="fc-study" aria-label="Study flashcards" hidden></section>
     <div class="md" id="md">${DOMPurify.sanitize(marked.parse(n.markdown))}</div>
-    <div class="end-mark" id="end"></div>
+    <section class="fc-list" id="fc-list" aria-label="Flashcards"></section>
     <section class="hl-list" id="hl-list" aria-label="Your highlights"></section>
     <section class="learn" id="quiz" aria-label="Test yourself"></section>
     <section class="learn" id="chat" aria-label="Ask about this note"></section>
@@ -1183,37 +1120,13 @@ async function openNote(id) {
   drawDiagrams($("#md"));
   $("#view").querySelectorAll(".crumb, .pager a").forEach(a => { a.removeAttribute("target"); a.removeAttribute("rel"); });
   renderActions();
+  renderCards();
   state.quizAnswers = store.get(`quiz:${n.id}`, {});
   renderHighlights();
   renderQuiz();
   renderChat();
   buildToc();
-  watchEnd(n);
   scrollTo({ top: 0 });
-}
-
-// A note counts as read once the reader reaches its end.
-let endObserver = null;
-function watchEnd(n) {
-  endObserver?.disconnect();
-  const end = $("#end");
-  if (!end || n.read_at || !("IntersectionObserver" in window)) return;
-  endObserver = new IntersectionObserver(([entry]) => {
-    if (!entry.isIntersecting || state.current !== n.id || state.note?.read_at) return;
-    endObserver.disconnect();
-    setRead(n.id, true);
-  });
-  endObserver.observe(end);
-}
-
-async function setRead(id, read) {
-  const res = await api(`/api/notes/${id}/read`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ read }) });
-  state.notes = state.notes.map(x => x.id === id ? { ...x, read_at: res.read_at } : x);
-  if (state.note?.id === id) {
-    state.note = { ...state.note, read_at: res.read_at };
-    renderActions();
-  }
-  renderList();
 }
 
 // Wrap the first place where the quote appears in the text with <mark>. Works across inline elements.
@@ -1246,6 +1159,47 @@ function markText(root, quote, id) {
     mark.appendChild(part);
   });
   return true;
+}
+
+function renderCards() {
+  const list = $("#fc-list"), n = state.note;
+  if (!list || !n) return;
+  const cards = n.flashcards || [], today = new Date().toLocaleDateString("en-CA");
+  const due = cards.filter(c => c.due <= today).length;
+  if (!cards.length) {
+    list.innerHTML = `<h2>Flashcards</h2><p>Turn this note into question and answer cards, so you remember it.</p>
+      <button class="btn" data-make-cards ${state.cardsBusy === n.id ? "disabled" : ""}>${state.cardsBusy === n.id ? `<span class="spin"></span><span>Writing cards…</span>` : `${ICON.cards}<span>Make flashcards</span>`}</button>`;
+    return;
+  }
+  list.innerHTML = `<div class="fc-head"><h2>Flashcards · ${cards.length}</h2>
+      <button class="btn ${due ? "primary" : ""}" data-study-cards>${ICON.cards}<span>${due ? `Study ${due} due` : "Nothing due"}</span></button></div>
+    ${cards.map(c => `<details class="fc-item"><summary>${esc(c.q)}</summary><p>${esc(c.a)}</p></details>`).join("")}`;
+}
+$("#view").addEventListener("click", e => {
+  if (!state.note) return;
+  if (e.target.closest("[data-make-cards]")) makeCards(state.note);
+  else if (e.target.closest("[data-study-cards]")) openStudy(true);
+  else if (e.target.closest("[data-practice]")) openStudy(false, true);
+  else if (e.target.closest("[data-close-study]")) closeStudy();
+});
+
+const localToday = () => new Date().toLocaleDateString("en-CA");
+function openStudy(scroll, all) {
+  const n = state.note;
+  if (!n?.flashcards?.length) return;
+  const today = localToday();
+  const queue = n.flashcards.filter(c => all || c.due <= today).map(c => ({ ...c, note: n.id }));
+  const later = n.flashcards.map(c => c.due).filter(d => d > today).sort();
+  state.review = { vid: n.id, inline: true, queue, total: queue.length, done: 0, shown: false, next: later[0] || null };
+  renderActions();
+  renderStudy();
+  if (scroll) $("#fc-study").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function closeStudy() {
+  state.review = null;
+  $("#fc-study").hidden = true;
+  $("#fc-study").innerHTML = "";
+  renderActions();
 }
 
 function renderHighlights() {
@@ -1422,14 +1376,12 @@ function renderActions(msg, kind, pct) {
     ${audioSupported ? `<label class="vh" for="voice">Voice</label><select class="voice" id="voice">${state.voices.map(v => `<option value="${v.id}" ${v.id === voice ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select>` : ""}
     <a class="btn" href="${esc(n.url || `https://youtu.be/${n.id}`)}" target="_blank" rel="noopener">${ICON.ext}<span>${n.kind === "article" ? "Read article" : "Watch"}</span></a>
     ${pinButton("note", n.id, n.title)}
-    <button class="btn" id="read-toggle" aria-pressed="${!!n.read_at}">${ICON.check}<span>${n.read_at ? "Mark unread" : "Mark read"}</span></button>
-    <button class="btn" id="cards" ${state.cardsBusy === n.id ? "disabled" : ""}>${state.cardsBusy === n.id ? `<span class="spin"></span><span>Writing cards…</span>` : `${ICON.cards}<span>${n.flashcards ? "Study cards" : "Make flashcards"}</span>`}</button>
+    <button class="btn" id="cards" ${n.flashcards?.length ? `aria-pressed="${!!state.review?.inline}"` : ""} ${state.cardsBusy === n.id ? "disabled" : ""}>${state.cardsBusy === n.id ? `<span class="spin"></span><span>Writing cards…</span>` : `${ICON.cards}<span>${!n.flashcards?.length ? "Make flashcards" : state.review?.inline ? "Hide flashcards" : "Flashcards"}</span>`}</button>
     <a class="btn" href="/api/notes/${n.id}/export.md" download>${ICON.download}<span>Export</span></a>
     ${kind === "err" ? `<span class="act-msg err">${esc(msg)}</span>` : ""}
     <button class="btn del" id="del" aria-label="Delete notes" title="Delete notes" ${msg && kind !== "err" ? "disabled" : ""}>${ICON.trash}</button>`;
   $("#del").onclick = () => { state.confirmDelete = n.id; renderActions(); $("#del-yes").focus(); };
-  $("#read-toggle").onclick = () => setRead(n.id, !n.read_at);
-  $("#cards").onclick = () => n.flashcards ? openReview(n.id) : makeCards(n);
+  $("#cards").onclick = () => !n.flashcards?.length ? makeCards(n) : state.review?.inline ? closeStudy() : openStudy();
   if (kind === "err") $("#listen").querySelector("span:last-child").textContent = "Try again";
   if (audioSupported) {
     $("#voice").onchange = e => { store.set("voice", e.target.value); renderActions(); };
@@ -1622,8 +1574,11 @@ function todayMeta() {
   const d = state.daily;
   $("#today-btn").setAttribute("aria-current", String(state.current === "today"));
   if (!d) return;
-  $("#today-meta").textContent = d.job ? d.job.message : !d.sources.length ? "Pick the channels you trust"
-    : d.date === d.today ? `${d.picks.length} worth watching` : "Not checked yet today";
+  const label = `Today · ${d.job ? d.job.message : !d.sources.length ? "Pick the channels you trust"
+    : d.date === d.today ? `${d.picks.length} worth watching` : "Not checked yet today"}`;
+  $("#today-btn").title = label;
+  $("#today-btn").setAttribute("aria-label", label);
+  $("#today-meta").textContent = !d.job && d.date === d.today && d.picks.length ? d.picks.length : "";
 }
 async function loadDaily() { state.daily = await api("/api/daily"); todayMeta(); return state.daily; }
 async function openToday(quiet) {
@@ -1797,8 +1752,8 @@ async function syncLive() {
   }
   if (notes.has(n.id)) {
     if (meta.created !== n.created) return openNote(n.id);  // Written again, for example as Detailed notes.
-    if (meta.read_at !== n.read_at || JSON.stringify(meta.audio) !== JSON.stringify(n.audio)) {
-      state.note = { ...n, read_at: meta.read_at, audio: meta.audio };
+    if (JSON.stringify(meta.audio) !== JSON.stringify(n.audio)) {
+      state.note = { ...n, audio: meta.audio };
       renderActions();
     }
   }
@@ -1848,82 +1803,66 @@ function connectLive() {
 async function makeCards(n) {
   state.cardsBusy = n.id;
   renderActions();
+  renderCards();
   try {
-    const cards = await api(`/api/notes/${n.id}/flashcards`, { method: "POST" });
-    n.flashcards = cards.length;
+    n.flashcards = await api(`/api/notes/${n.id}/flashcards`, { method: "POST" });
     state.cardsBusy = null;
-    loadDue();
-    if (state.current === n.id) openReview(n.id);
+    if (state.current === n.id) { renderCards(); openStudy(); }
   } catch (e) {
     state.cardsBusy = null;
-    if (state.current === n.id) renderActions(e.message, "err");
+    if (state.current === n.id) { renderActions(e.message, "err"); renderCards(); }
   }
 }
-function reviewMeta() {
-  $("#review-btn").setAttribute("aria-current", String(state.current === "review"));
-  if (state.due) $("#review-meta").textContent = state.due.cards.length ? `${state.due.cards.length} card${state.due.cards.length === 1 ? "" : "s"} due` : "Nothing due";
-}
-async function loadDue() { state.due = await api("/api/flashcards"); reviewMeta(); }
-async function openReview(vid) {
-  state.current = "review"; state.note = null;
-  history.replaceState(null, "", vid ? `#review/${vid}` : "#review");
-  renderList();
-  $("#layout").classList.remove("has-toc");
-  $("#toc").innerHTML = "";
-  $("#top-title").textContent = "Review";
-  document.title = "Review · EasyNotes";
-  let d;
-  try { d = await api(`/api/flashcards${vid ? `?note=${vid}` : ""}`); } catch { return welcome(); }
-  if (state.current !== "review") return;
-  state.review = { vid, queue: d.cards, total: d.cards.length, done: 0, shown: false, next: d.next_due };
-  renderReview();
-  scrollTo({ top: 0 });
-}
-function renderReview() {
-  const r = state.review, c = r.queue[0];
-  const note = r.vid && state.notes.find(n => n.id === r.vid);
-  const next = r.next ? new Date(r.next + "T12:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }) : "";
-  $("#view").innerHTML = `
-    <div class="kicker"><span>Review</span>${note ? `<span>${esc(note.title)}</span>` : `<span>All notes</span>`}${c ? `<span>${r.done + 1} of ${r.total}</span>` : ""}</div>
-    <h1>${c ? "Flashcards" : r.total ? "All done" : "Nothing to review"}</h1>
-    ${c ? `<div class="flash">
-      ${r.vid ? "" : `<div class="from">From <a href="#${esc(c.note)}">${esc(c.title)}</a></div>`}
+function flashCard(r) {
+  const c = r.queue[0];
+  return `<div class="flash">
       <p class="q">${esc(c.q)}</p>
       ${r.shown ? `<p class="a">${esc(c.a)}</p>` : ""}
     </div>
     <div class="flash-row">${r.shown
       ? `<button class="btn" data-grade="again"><span>Again</span><kbd>1</kbd></button><button class="btn primary" data-grade="good"><span>Good</span><kbd>2</kbd></button><button class="btn" data-grade="easy"><span>Easy</span><kbd>3</kbd></button>`
-      : `<button class="btn primary" id="show-answer"><span>Show answer</span><kbd>Space</kbd></button>`}</div>`
-    : `<p class="col-note">${r.total ? `You reviewed ${r.total} card${r.total === 1 ? "" : "s"}. ` : ""}${next ? `The next cards are due ${esc(next)}.` : r.total ? "" : "Open a note and select Make flashcards to get cards for it."}</p>
-      ${r.vid ? `<div class="flash-row" style="max-width:240px"><a class="btn" href="#${esc(r.vid)}"><span>Back to the note</span></a></div>` : ""}`}`;
-  $("#view").querySelector(".flash-row button")?.focus({ preventScroll: true });
+      : `<button class="btn primary" id="show-answer"><span>Show answer</span><kbd>Space</kbd></button>`}</div>`;
+}
+const longDate = d => d ? new Date(d + "T12:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }) : "";
+function renderStudy() {
+  const r = state.review, panel = $("#fc-study");
+  if (!panel) return;
+  const c = r.queue[0], next = longDate(r.next), count = state.note?.flashcards?.length || 0;
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="fc-study-head"><b>Flashcards</b>${c ? `<span>${r.done + 1} of ${r.total}</span>` : ""}<button class="btn" data-close-study>Close</button></div>
+    ${c ? flashCard(r) : `<p class="col-note">${r.total ? `Nice. You went through ${r.total} card${r.total === 1 ? "" : "s"}. ` : "No cards are due for this note. "}${next ? `The next ones are due ${esc(next)}.` : ""}</p>
+      <div class="flash-row" style="max-width:280px"><button class="btn" data-practice><span>Practice all ${count} cards</span></button></div>`}`;
+  panel.querySelector(".flash-row button")?.focus({ preventScroll: true });
 }
 async function grade(g) {
   const r = state.review, c = r.queue.shift();
   r.shown = false;
   if (g === "again") r.queue.push(c); else r.done++;
-  renderReview();
-  try { await api(`/api/flashcards/${c.note}/${c.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ grade: g }) }); } catch {}
-  if (!r.queue.length) { r.next = (await api(`/api/flashcards${r.vid ? `?note=${r.vid}` : ""}`).catch(() => ({}))).next_due || r.next; renderReview(); }
-  loadDue().catch(() => null);
+  renderStudy();
+  let saved = null;
+  try { saved = await api(`/api/flashcards/${c.note}/${c.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ grade: g }) }); } catch {}
+  const n = state.note;
+  if (saved && n?.id === c.note) { n.flashcards = n.flashcards.map(x => x.id === saved.id ? saved : x); renderCards(); }
+  if (!r.queue.length && n) r.next = n.flashcards.map(x => x.due).filter(d => d > localToday()).sort()[0] || null;
+  if (state.review === r) renderStudy();
 }
-$("#review-btn").onclick = () => { openReview(); if (mq.matches) side(false); };
+const studying = () => state.review && state.review.vid === state.current;
 $("#view").addEventListener("click", e => {
-  if (state.current !== "review") return;
-  if (e.target.closest("#show-answer")) { state.review.shown = true; renderReview(); }
+  if (!studying()) return;
+  if (e.target.closest("#show-answer")) { state.review.shown = true; renderStudy(); }
   const g = e.target.closest("[data-grade]");
   if (g) grade(g.dataset.grade);
 });
 document.addEventListener("keydown", e => {
-  if (state.current !== "review" || !state.review?.queue.length || e.metaKey || e.ctrlKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
-  if (!state.review.shown && (e.key === " " || e.key === "Enter")) { e.preventDefault(); state.review.shown = true; renderReview(); }
+  if (!studying() || !state.review.queue.length || e.metaKey || e.ctrlKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  if (!state.review.shown && (e.key === " " || e.key === "Enter")) { e.preventDefault(); state.review.shown = true; renderStudy(); }
   else if (state.review.shown && ["1", "2", "3"].includes(e.key)) { e.preventDefault(); grade(["again", "good", "easy"][+e.key - 1]); }
 });
 
 function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   if (h === "today") { if (state.current !== "today") openToday(); return true; }
-  if (h === "review" || h.startsWith("review/")) { openReview(h.slice(7) || undefined); return true; }
   if (h.startsWith("c/")) { if (state.current !== "c:" + h.slice(2)) openCollection(h.slice(2)); return true; }
   if (/^[\w-]{11}$/.test(h) && state.notes.some(n => n.id === h)) { if (state.current !== h) openNote(h); return true; }
   return false;
@@ -1933,10 +1872,9 @@ addEventListener("hashchange", route);
 applyTheme();
 renderSeg();
 $("#p-speed").textContent = `${store.get("speed", 1)}×`;
-$("#unread-only").setAttribute("aria-pressed", state.unreadOnly);
 syncPlayer();
 connectLive();
-Promise.all([api("/api/voices").then(v => { state.voices = v; }), loadNotes(), loadCollections(), loadDaily().catch(() => null), loadDue().catch(() => null), resumeJobs().catch(() => null)]).then(() => {
+Promise.all([api("/api/voices").then(v => { state.voices = v; }), loadNotes(), loadCollections(), loadDaily().catch(() => null), resumeJobs().catch(() => null)]).then(() => {
   if (route()) return;
   if (state.daily?.sources.length) openToday();
   else if (state.notes.length) openNote(state.notes[0].id);

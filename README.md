@@ -43,10 +43,11 @@ uvx --from huggingface_hub hf download mlx-community/Kokoro-82M-bf16
 
 ## Start the app
 
-Go to the project folder and start the server:
+Get the code and start the server:
 
 ```bash
-cd ytnotes
+git clone https://github.com/khantseithu/easynotes.git
+cd easynotes
 python3 ytnotes.py
 ```
 
@@ -72,21 +73,18 @@ Glossary terms have a dotted underline in the text. Select a term to see what it
 
 Type in the Search box at the top of the library to find words in the text of your notes, not only in the titles. Each note that matches shows a short piece of the text around the word. Every word that you type must appear in the note. Select Unread to hide the notes that you have read.
 
-A note counts as read when you scroll to its end. To change this yourself, select Mark read or Mark unread below the title.
-
 To keep a passage, select some text in a note. A small bar appears above the text. Select Highlight to mark the passage, or Add a comment to write a note about it. Your highlights appear at the end of the note, and you can remove them there. They are saved on your Mac in `notes/highlights.json`.
 
 To take your notes elsewhere, use these downloads:
 
 - Export under a note saves that note as a Markdown file. The file has a short header with the title, the channel and the link, and it lists your highlights at the end. Obsidian and most other note apps can open it.
 - Export all in the library saves every note as a Markdown file in a zip file.
-- Flashcards in the library saves each glossary term and each AI flashcard as a row of a CSV file. In Anki, choose Import and select the file. The file has no header row, and each row has the term, its explanation, and the title of the note.
 
 ## Flashcards
 
 To remember a note, select Make flashcards below its title. The model reads the note and writes question and answer cards about its key ideas, frameworks and numbers. Then you study them right away.
 
-Select Review at the top of the library to study every card that is due. Read the question, press Space to see the answer, and then grade yourself: 1 for Again, 2 for Good, or 3 for Easy. Cards that you know come back after a day, then three days, then less and less often. Cards that you miss come back in the same session. Your cards are saved on your Mac in `notes/flashcards.json`.
+Select Flashcards below a note's title to study its cards that are due. Read the question, press Space to see the answer, and then grade yourself: 1 for Again, 2 for Good, or 3 for Easy. Cards that you know come back after a day, then three days, then less and less often. Cards that you miss come back in the same session. Your cards are saved on your Mac in `notes/flashcards.json`.
 
 ## Quiz and questions
 
@@ -111,23 +109,11 @@ To make the list from the command line, run `python3 ytnotes.py --daily`. The fi
 
 ## Live updates
 
-Every open copy of the app stays up to date without a reload: browser tabs, your phone, and the Chrome extension. When you make notes, mark a note read, add a highlight, record audio, delete a note or change your channels on one of them, the others show the change within a second. Notes that you start on one device show their progress on the others.
+Every open copy of the app stays up to date without a reload: browser tabs and the Chrome extension. When you make notes, add a highlight, record audio, delete a note or change your channels on one of them, the others show the change within a second. Notes that you start on one device show their progress on the others.
 
 The server sends these changes as [Server-Sent Events](https://developer.mozilla.org/docs/Web/API/Server-sent_events) on `/api/events`. If the connection drops, the app reconnects by itself and reloads what changed. While it is disconnected, it checks for progress the old way, every one or two seconds.
 
 Changes from the command line, for example `python3 ytnotes.py "https://youtu.be/VIDEO_ID"`, run in a separate process, so open apps show them after a reload.
-
-## Use the app on your phone
-
-Your phone and your Mac must be on the same Wi-Fi network. Start the server with the `--lan` flag:
-
-```bash
-python3 ytnotes.py --lan
-```
-
-The server shows a second address, for example `http://192.168.1.117:8765`. Open that address on your phone. On an iPhone, select Share and then Add to Home Screen to get an app icon.
-
-Use `--lan` only on a network that you trust. The app has no password, so each device on the network can open it.
 
 ## Use the Chrome extension
 
@@ -221,3 +207,17 @@ EasyNotes uses work from these projects:
 - [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), the [mlx-community](https://huggingface.co/mlx-community/Kokoro-82M-bf16) conversion, and [mlx-audio](https://github.com/Blaizzy/mlx-audio).
 - [Pele](https://github.com/obsidianmd/pele) by Obsidian, MIT license, which draws the diagrams. A copy is in `extension/vendor/`.
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api).
+
+## Privacy
+
+Your notes, audio and highlights stay in the `notes/` folder on your computer. The app has no accounts and no analytics. The transcripts and article text go to the model command that you choose, so the terms of that provider apply. The page also loads two libraries from cdnjs.
+
+Use the app only with content that you have the right to use, and follow the terms of the sites that you read from. This project is not affiliated with YouTube or Google.
+
+## Contribute
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). To report a security problem, see [SECURITY.md](SECURITY.md).
+
+## License
+
+EasyNotes is available under the [MIT License](LICENSE).

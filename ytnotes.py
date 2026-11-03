@@ -805,6 +805,17 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+    def refused(self):
+        host = self.headers.get("Host") or ""
+        origin = self.headers.get("Origin")
+        foreign_host = urlparse(f"//{host}").hostname not in ("127.0.0.1", "localhost", "::1")
+        foreign_origin = (self.command != "GET" and origin is not None
+                          and not origin.startswith("chrome-extension://") and urlparse(origin).netloc != host)
+        if not (foreign_host or foreign_origin):
+            return False
+        self.send(403, {"error": "This request came from another site"})
+        return True
+
     def send(self, code, body, ctype="application/json", headers=None):
         data = body if isinstance(body, bytes) else json.dumps(body).encode()
         self.send_response(code)
@@ -847,6 +858,8 @@ class Handler(BaseHTTPRequestHandler):
         BUS.stream(self.wfile.write)
 
     def do_GET(self):
+        if self.refused():
+            return
         url = urlparse(self.path)
         self.path = url.path
         query = parse_qs(url.query)
@@ -900,7 +913,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(404, {"error": "not found"})
             return self.send(200, {**meta, "markdown": note_text(meta["id"]),
                                    "highlights": library.highlights_for(HIGHLIGHTS, meta["id"]),
-                                   "flashcards": len(library.load(FLASHCARDS).get(meta["id"], [])),
+                                   "flashcards": library.load(FLASHCARDS).get(meta["id"], []),
                                    "collections": note_collections(meta["id"]),
                                    "quiz": learn.quiz_for(LEARN, meta["id"]),
                                    "chat": learn.chat_for(LEARN, meta["id"])})
@@ -925,6 +938,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send(404, {"error": "not found"})
 
     def do_POST(self):
+        if self.refused():
+            return
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
         m = re.fullmatch(r"/api/notes/([\w-]{11})/read", self.path)
         if m:
@@ -1007,6 +1022,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send(202, JOBS[job_id])
 
     def do_DELETE(self):
+        if self.refused():
+            return
         m = re.fullmatch(r"/api/notes/([\w-]{11})/chat", urlparse(self.path).path)
         if m:
             learn.clear_chat(LEARN, m.group(1))
@@ -1032,16 +1049,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send(200, {"id": m.group(1), "deleted": True})
 
 
-def lan_ip():
-    import socket
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        try:
-            sock.connect(("10.255.255.255", 1))
-            return sock.getsockname()[0]
-        except OSError:
-            return "127.0.0.1"
-
-
 def main():
     ap = argparse.ArgumentParser(description="Read YouTube videos instead of watching them.")
     ap.add_argument("input", nargs="*", help="YouTube links, playlist links, or a topic; omit to open the app")
@@ -1051,7 +1058,6 @@ def main():
     ap.add_argument("--level", default="normal", choices=LEVELS, help="how much detail the notes keep")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true", help="don't open the browser")
-    ap.add_argument("--lan", action="store_true", help="also serve on your local network, e.g. for your phone")
     ap.add_argument("--audio", action="store_true", help="also record an audio version with Kokoro")
     ap.add_argument("--voice", default=VOICES[0][0], choices=[v for v, _ in VOICES])
     ap.add_argument("--daily", action="store_true",
@@ -1095,11 +1101,9 @@ def main():
 
     Handler.model = args.model
     threading.Thread(target=auto_daily, args=(args.model,), daemon=True).start()
-    server = ThreadingHTTPServer(("0.0.0.0" if args.lan else "127.0.0.1", args.port), Handler)
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     url = f"http://127.0.0.1:{args.port}"
     print(f"EasyNotes running at {url}  (Ctrl+C to stop)")
-    if args.lan:
-        print(f"On your phone (same Wi-Fi): http://{lan_ip()}:{args.port}")
     if not args.no_open:
         webbrowser.open(url)
     try:
