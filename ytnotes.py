@@ -729,10 +729,22 @@ def daily_view():
 
 
 class Handler(BaseHTTPRequestHandler):
+    lan = False
     model = None
 
     def log_message(self, *args):
         pass
+
+    def refused(self):
+        host = self.headers.get("Host") or ""
+        origin = self.headers.get("Origin")
+        foreign_host = not self.lan and urlparse(f"//{host}").hostname not in ("127.0.0.1", "localhost", "::1")
+        foreign_origin = (self.command != "GET" and origin is not None
+                          and not origin.startswith("chrome-extension://") and urlparse(origin).netloc != host)
+        if not (foreign_host or foreign_origin):
+            return False
+        self.send(403, {"error": "This request came from another site"})
+        return True
 
     def send(self, code, body, ctype="application/json", headers=None):
         data = body if isinstance(body, bytes) else json.dumps(body).encode()
@@ -769,6 +781,8 @@ class Handler(BaseHTTPRequestHandler):
                 pass
 
     def do_GET(self):
+        if self.refused():
+            return
         url = urlparse(self.path)
         self.path = url.path
         query = parse_qs(url.query)
@@ -843,6 +857,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send(404, {"error": "not found"})
 
     def do_POST(self):
+        if self.refused():
+            return
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
         m = re.fullmatch(r"/api/notes/([\w-]{11})/read", self.path)
         if m:
@@ -908,6 +924,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send(202, JOBS[job_id])
 
     def do_DELETE(self):
+        if self.refused():
+            return
         m = re.fullmatch(r"/api/sources/(UC[\w-]{22})", urlparse(self.path).path)
         if m:
             return self.send(200, DAILY.sources()) if DAILY.remove(m.group(1)) else self.send(404, {"error": "not found"})
@@ -986,6 +1004,7 @@ def main():
         return
 
     Handler.model = args.model
+    Handler.lan = args.lan
     threading.Thread(target=auto_daily, args=(args.model,), daemon=True).start()
     server = ThreadingHTTPServer(("0.0.0.0" if args.lan else "127.0.0.1", args.port), Handler)
     url = f"http://127.0.0.1:{args.port}"

@@ -43,9 +43,10 @@ uvx --from huggingface_hub hf download mlx-community/Kokoro-82M-bf16
 
 ## Start the app
 
-Go to the project folder and start the server:
+Get the code and start the server:
 
 ```bash
+git clone https://github.com/khantseithu/ytnotes.git
 cd ytnotes
 python3 ytnotes.py
 ```
@@ -108,7 +109,7 @@ python3 ytnotes.py --lan
 
 The server shows a second address, for example `http://192.168.1.117:8765`. Open that address on your phone. On an iPhone, select Share and then Add to Home Screen to get an app icon.
 
-Use `--lan` only on a network that you trust. The app has no password, so each device on the network can open it.
+Use `--lan` only on a network that you trust. The app has no password, so each device on the network can open it. See [SECURITY.md](SECURITY.md).
 
 ## Use the Chrome extension
 
@@ -200,3 +201,17 @@ EasyNotes uses work from these projects:
 - [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), the [mlx-community](https://huggingface.co/mlx-community/Kokoro-82M-bf16) conversion, and [mlx-audio](https://github.com/Blaizzy/mlx-audio).
 - [Pele](https://github.com/obsidianmd/pele) by Obsidian, MIT license, which draws the diagrams. A copy is in `extension/vendor/`.
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api).
+
+## Privacy
+
+Your notes, audio and highlights stay in the `notes/` folder on your computer. The app has no accounts and no analytics. The transcripts and article text go to the model command that you choose, so the terms of that provider apply. The page also loads two libraries from cdnjs.
+
+Use the app only with content that you have the right to use, and follow the terms of the sites that you read from. This project is not affiliated with YouTube or Google.
+
+## Contribute
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). To report a security problem, see [SECURITY.md](SECURITY.md).
+
+## License
+
+EasyNotes is available under the [MIT License](LICENSE).
